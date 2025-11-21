@@ -19,7 +19,8 @@
 
 ### 2025-09
 - [x] 配置 Git 与 GitHub SSH 环境
-
+- [ ] 学习 Python 列表推导式
+- [ ] 探索 LeetCode 第一题
 
 ---
-*Created by Leo Huang. Continuing to grow every day.
+*Created by Leo Huang. Continuing to grow every day.*
