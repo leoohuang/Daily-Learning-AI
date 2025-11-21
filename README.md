@@ -19,7 +19,7 @@
 
 ### 2025-09
 - [x] 配置 Git 与 GitHub SSH 环境
-- [ ] 学习 Python 列表推导式
+- [ ] 学习 Python 列表推导式([查看笔记](./Python/list-comprehensions.md))
 - [ ] 探索 LeetCode 第一题
 
 ---
