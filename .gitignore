@@ -1,0 +1,9 @@
+# 忽略 Python 的缓存文件
+__pycache__/
+*.pyc
+
+# 忽略 Manim 生成的视频和媒体文件夹
+media/
+
+# 忽略系统生成的垃圾文件 (Mac 特有)
+.DS_Store
