@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Statistics Master Class: Pro Edition</title>
+    
+    <!-- 依赖库 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.1.0"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    
+    <!-- 字体与排版 -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Apple-inspired Design System */
+        :root {
+            --bg-body: #F5F5F7;
+            --text-primary: #1D1D1F;
+            --accent-blue: #0071E3;
+            --accent-indigo: #5856D6;
+            --accent-orange: #FF9500;
+            --accent-green: #34C759;
+            --code-bg: #1F2024;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-primary);
+            overflow-x: hidden;
+        }
+
+        /* 隐藏滚动条但保留功能 */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Scrollytelling 布局核心 */
+        .prose-section {
+            min-height: 100vh;
+            padding: 4rem 2rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            opacity: 0.2;
+            transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+            border-left: 3px solid transparent;
+        }
+        .prose-section.active {
+            opacity: 1;
+            border-left: 3px solid var(--accent-blue);
+        }
+
+        /* 高级卡片样式 */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 24px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.08);
+            border: 1px solid rgba(0,0,0,0.05);
+        }
+
+        /* 交互式文本高亮 */
+        .interactive-text {
+            cursor: help;
+            border-bottom: 2px dashed var(--accent-blue);
+            color: var(--accent-blue);
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .interactive-text:hover {
+            background-color: rgba(0, 113, 227, 0.1);
+            border-radius: 4px;
+        }
+
+        /* 代码块样式 */
+        pre {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--code-bg);
+            color: #fff;
+            padding: 1.5rem;
+            border-radius: 16px;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            position: relative;
+            overflow: hidden;
+            margin-top: 1.5rem;
+        }
+        .code-header {
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 28px;
+            background: rgba(255,255,255,0.1);
+            display: flex; align-items: center; padding-left: 12px; gap: 6px;
+        }
+        .dot { width: 10px; height: 10px; border-radius: 50%; }
+
+        /* 数学公式容器 */
+        .math-block {
+            background: #F5F5F7;
+            padding: 1.5rem;
+            border-radius: 12px;
+            text-align: center;
+            margin: 1.5rem 0;
+            font-size: 1.1rem;
+        }
+
+        /* 右侧面板动画 */
+        .viz-container {
+            transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        /* 章节标签 */
+        .chapter-tag {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 0.5rem;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body class="flex flex-col lg:flex-row h-screen overflow-hidden">
+
+    <!-- 左侧：滚动教材 (The Textbook) -->
+    <main class="lg:w-1/2 h-full overflow-y-auto scroll-smooth no-scrollbar relative z-10 bg-white">
+        <div class="max-w-2xl mx-auto pb-32">
+            
+            <!-- 封面 -->
+            <section class="min-h-[90vh] flex flex-col justify-center px-8">
+                <p class="text-blue-600 font-bold tracking-wider uppercase mb-4 text-sm">Interactive Course</p>
+                <h1 class="text-6xl font-extrabold tracking-tight mb-6 text-slate-900 leading-tight">
+                    统计学<br>全景指南
+                </h1>
+                <p class="text-xl text-slate-500 leading-relaxed mb-8">
+                    6大核心模块，从基础描述到复杂回归。向下滚动，右侧的实验室将随你的阅读实时演变。
+                </p>
+                <div class="flex items-center text-sm text-slate-400 gap-2 animate-bounce">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>
+                    <span>Scroll to Start</span>
+                </div>
+            </section>
+
+            <!-- 1. 描述性统计 -->
+            <section id="sec-desc" class="prose-section" data-viz="desc">
+                <span class="chapter-tag text-blue-500">Chapter 01</span>
+                <h2 class="text-4xl font-bold mb-6 text-slate-900">数据的“证件照”</h2>
+                <p class="text-lg text-slate-600 mb-6 leading-relaxed">
+                    在处理复杂数据前，我们需要先看清它的长相。描述性统计是数据的快照，核心有两个参数：
+                </p>
+                <div class="space-y-6">
+                    <div>
+                        <h3 class="text-xl font-semibold mb-2 text-slate-800">均值 (Mean, $\mu$)</h3>
+                        <p class="text-slate-600">
+                            数据的重心。移动右侧的 <span class="interactive-text">Mean滑块</span>，你会看到整座“山峰”在水平移动。
+                        </p>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-semibold mb-2 text-slate-800">标准差 (SD, $\sigma$)</h3>
+                        <p class="text-slate-600">
+                            数据的胖瘦。标准差越小，山峰越陡峭（数据越集中）。
+                        </p>
+                    </div>
+                </div>
+                <pre><div class="code-header"><div class="dot bg-red-500"></div><div class="dot bg-yellow-500"></div><div class="dot bg-green-500"></div></div><code>data <- c(15, 20, 25, 30, 35)
+mean(data)  # 25
+sd(data)    # 7.9</code></pre>
+            </section>
+
+            <!-- 2. 推断统计 (Inferential) -->
+            <section id="sec-inf" class="prose-section" data-viz="inf">
+                <span class="chapter-tag text-indigo-500">Chapter 02</span>
+                <h2 class="text-4xl font-bold mb-6 text-slate-900">推断的艺术</h2>
+                <p class="text-lg text-slate-600 mb-6 leading-relaxed">
+                    我们只能看到样本，却想推测上帝视角的“总体”。这就是推断统计的任务。
+                </p>
+                <div class="bg-indigo-50 border-l-4 border-indigo-500 p-5 rounded-r-xl mb-6">
+                    <h4 class="font-bold text-indigo-900 mb-2">P 值的直觉</h4>
+                    <p class="text-indigo-800 text-sm leading-relaxed">
+                        如果两个组真的<b>没有区别</b>（零假设 $H_0$ 为真），那么我观察到这么大差异的概率是多少？<br>
+                        当 P 值很小（通常 < 0.05）时，我们认为这不太可能是巧合，从而拒绝零假设。
+                    </p>
+                </div>
+                <p class="text-slate-600">
+                    右侧展示了一个 T 分布。试着拖动 <span class="interactive-text">T值滑块</span>。当你进入红色的“拒绝域”时，P 值会变得显著。
+                </p>
+                <pre><div class="code-header"><div class="dot bg-red-500"></div><div class="dot bg-yellow-500"></div><div class="dot bg-green-500"></div></div><code># 独立样本 t 检验
+t.test(group_A, group_B)
+# P < 0.05 -> 显著差异</code></pre>
+            </section>
+
+            <!-- 3. 回归基础 -->
+            <section id="sec-reg" class="prose-section" data-viz="reg">
+                <span class="chapter-tag text-red-500">Chapter 03</span>
+                <h2 class="text-4xl font-bold mb-6 text-slate-900">寻找规律的直线</h2>
+                <p class="text-lg text-slate-600 mb-6 leading-relaxed">
+                    线性回归试图画一条线，让它离所有数据点“最近”。这条线由两个灵魂决定：
+                </p>
+                <ul class="space-y-4 mb-6">
+                    <li class="p-4 rounded-xl border border-gray-100 shadow-sm bg-white">
+                        <strong class="text-blue-600 block mb-1">截距 ($b_0$)</strong>
+                        <span class="text-slate-600 text-sm">起步价。当 $x=0$ 时，$y$ 的数值。</span>
+                    </li>
+                    <li class="p-4 rounded-xl border border-gray-100 shadow-sm bg-white">
+                        <strong class="text-red-600 block mb-1">斜率 ($b_1$)</strong>
+                        <span class="text-slate-600 text-sm">单价。$x$ 每增加 1，$y$ 增加多少。</span>
+                    </li>
+                </ul>
+                <div class="math-block">
+                    $$ y = \color{blue}{b_0} + \color{red}{b_1}x + \epsilon $$
+                </div>
+            </section>
+
+            <!-- 4. 多元回归 (Multiple) -->
+            <section id="sec-multi" class="prose-section" data-viz="multi">
+                <span class="chapter-tag text-teal-500">Chapter 04</span>
+                <h2 class="text-4xl font-bold mb-6 text-slate-900">控制变量的力量</h2>
+                <p class="text-lg text-slate-600 mb-6 leading-relaxed">
+                    现实世界很少是单一因素决定的。多元回归允许我们同时考虑多个变量 ($x_1, x_2...$)。
+                </p>
+                <h3 class="text-xl font-bold mb-3 mt-8">交互作用 (Interaction)</h3>
+                <p class="text-slate-600 mb-4">
+                    有时候，$x_1$ 的效果取决于 $x_2$。比如：<b>咖啡($x_1$)</b> 提神的效果，取决于你是否 <b>缺觉($x_2$)</b>。
+                </p>
+                <p class="text-slate-600 mb-6">
+                    右侧是一个简单的预测计算器。试着调整两个变量，看看预测结果如何变化。
+                </p>
+                <pre><div class="code-header"><div class="dot bg-red-500"></div><div class="dot bg-yellow-500"></div><div class="dot bg-green-500"></div></div><code># 多元回归 + 交互作用
+lm(score ~ hours * sleep, data = df)
+# 等同于: hours + sleep + hours:sleep</code></pre>
+            </section>
+
+            <!-- 5. 数据变换 (Data Trans) -->
+            <section id="sec-trans" class="prose-section" data-viz="trans">
+                <span class="chapter-tag text-orange-500">Chapter 05</span>
+                <h2 class="text-4xl font-bold mb-6 text-slate-900">驯服不听话的数据</h2>
+                <p class="text-lg text-slate-600 mb-6 leading-relaxed">
+                    真实数据往往不符合正态分布（比如反应时、工资，都是右偏的）。这时我们需要“魔法”。
+                </p>
+                <div class="grid grid-cols-1 gap-4 mb-6">
+                    <div class="bg-orange-50 p-4 rounded-xl">
+                        <h4 class="font-bold text-orange-800 mb-1">Log 变换 (对数)</h4>
+                        <p class="text-sm text-orange-900">
+                            专治“长尾巴”。它能把拉长的右尾缩回来，让分布变对称。
+                        </p>
+                    </div>
+                </div>
+                <p class="text-slate-600">
+                    观察右侧图表，点击 <span class="interactive-text">Log 按钮</span>，看偏态分布如何瞬间变回正态。
+                </p>
+                <pre><div class="code-header"><div class="dot bg-red-500"></div><div class="dot bg-yellow-500"></div><div class="dot bg-green-500"></div></div><code># 原始模型不佳
+lm(rt ~ age, data)
+
+# 变换后效果更好
+lm(log(rt) ~ age, data)</code></pre>
+            </section>
+
+            <!-- 6. 分类预测变量 (Categorical) -->
+            <section id="sec-cat" class="prose-section" data-viz="cat">
+                <span class="chapter-tag text-green-500">Chapter 06</span>
+                <h2 class="text-4xl font-bold mb-6 text-slate-900">从文字到数学</h2>
+                <p class="text-lg text-slate-600 mb-6 leading-relaxed">
+                    回归方程只吃数字。怎么把 "Group A/B/C" 喂给它？答案是<b>虚拟编码</b>与<b>基准变换</b>。
+                </p>
+                <div class="bg-slate-100 p-5 rounded-xl mb-6 border border-slate-200">
+                    <ul class="list-disc ml-4 space-y-2 text-slate-700">
+                        <li><b>截距</b> 永远等于 <b>基准组</b> 的均值。</li>
+                        <li><b>斜率</b> 永远等于 <b>比较组与基准组</b> 的差值。</li>
+                    </ul>
+                </div>
+                <p class="text-slate-600 mb-6">
+                    在右侧实验室中，尝试切换基准组。你会发现数据点没动，但描述它们的数学方程完全变了。
+                </p>
+                <pre><div class="code-header"><div class="dot bg-red-500"></div><div class="dot bg-yellow-500"></div><div class="dot bg-green-500"></div></div><code># 切换基准为 B
+df$group <- relevel(df$group, ref = "B")
+lm(value ~ group, data = df)</code></pre>
+            </section>
+
+            <section class="h-[30vh] flex items-center justify-center text-slate-300 pb-20">
+                <p>End of Course</p>
+            </section>
+        </div>
+    </main>
+
+    <!-- 右侧：Sticky 交互实验室 (The Lab) -->
+    <aside class="hidden lg:flex w-1/2 bg-[#F5F5F7] h-full items-center justify-center relative p-8">
+        <div class="glass-panel w-full max-w-xl h-[80vh] flex flex-col p-6 relative overflow-hidden transition-all duration-500 shadow-2xl" id="lab-panel">
+            
+            <!-- 顶部状态栏 -->
+            <div class="flex justify-between items-center mb-6 pb-4 border-b border-gray-100">
+                <div class="flex items-center gap-2">
+                    <div class="w-3 h-3 rounded-full bg-red-500 shadow-sm"></div>
+                    <div class="w-3 h-3 rounded-full bg-yellow-500 shadow-sm"></div>
+                    <div class="w-3 h-3 rounded-full bg-green-500 shadow-sm"></div>
+                </div>
+                <div class="text-xs font-mono text-gray-400 uppercase tracking-widest font-bold" id="viz-title">LABORATORY</div>
+            </div>
+
+            <!-- 可视化容器 -->
+            <div class="flex-1 relative viz-container">
+                
+                <!-- 1. 描述性统计 Lab -->
+                <div id="viz-desc" class="viz-scene absolute inset-0 flex flex-col opacity-0 pointer-events-none transition-all duration-500">
+                    <div class="flex-1 bg-white rounded-2xl shadow-inner p-4 mb-6 relative border border-gray-100">
+                         <canvas id="descChart"></canvas>
+                    </div>
+                    <div class="space-y-6 px-4">
+                        <div>
+                            <div class="flex justify-between text-sm font-bold text-slate-700 mb-2">
+                                <span>均值 ($\mu$): <span id="val-mean" class="font-mono text-blue-600">50</span></span>
+                            </div>
+                            <input type="range" id="input-mean" min="20" max="80" value="50" class="w-full accent-blue-600">
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-sm font-bold text-slate-700 mb-2">
+                                <span>标准差 ($\sigma$): <span id="val-sd" class="font-mono text-purple-600">10</span></span>
+                            </div>
+                            <input type="range" id="input-sd" min="5" max="25" value="10" class="w-full accent-purple-600">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. 推断统计 Lab (New) -->
+                <div id="viz-inf" class="viz-scene absolute inset-0 flex flex-col opacity-0 pointer-events-none transition-all duration-500">
+                    <div class="flex-1 bg-white rounded-2xl shadow-inner p-4 mb-6 relative border border-gray-100">
+                         <canvas id="infChart"></canvas>
+                         <div class="absolute top-4 right-4 bg-red-50 text-red-600 px-2 py-1 rounded text-xs font-bold border border-red-100">Rejection Region (α=0.05)</div>
+                    </div>
+                    <div class="space-y-6 px-4">
+                        <div class="bg-slate-50 p-4 rounded-xl text-center mb-4 transition-colors duration-300" id="inf-result-box">
+                            <span class="text-xs text-gray-500 uppercase font-bold tracking-wider block mb-1">Conclusion</span>
+                            <span class="text-lg font-bold text-gray-700" id="inf-result-text">Not Significant (P > 0.05)</span>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-sm font-bold text-slate-700 mb-2">
+                                <span>T Value: <span id="val-t" class="font-mono text-indigo-600">0.0</span></span>
+                            </div>
+                            <input type="range" id="input-t" min="-4" max="4" step="0.1" value="0" class="w-full accent-indigo-600">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. 回归基础 Lab -->
+                <div id="viz-reg" class="viz-scene absolute inset-0 flex flex-col opacity-0 pointer-events-none transition-all duration-500">
+                     <div class="flex-1 bg-white rounded-2xl shadow-inner p-4 mb-6 relative border border-gray-100">
+                         <canvas id="regChart"></canvas>
+                    </div>
+                    <div class="space-y-6 px-4">
+                        <div>
+                            <div class="flex justify-between text-sm font-bold text-slate-700 mb-2">
+                                <span>斜率 ($b_1$): <span id="val-slope" class="font-mono text-red-600">1.0</span></span>
+                            </div>
+                            <input type="range" id="input-slope" min="-5" max="5" step="0.1" value="1" class="w-full accent-red-600">
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-sm font-bold text-slate-700 mb-2">
+                                <span>截距 ($b_0$): <span id="val-intercept" class="font-mono text-blue-600">0</span></span>
+                            </div>
+                            <input type="range" id="input-intercept" min="-10" max="10" value="0" class="w-full accent-blue-600">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. 多元回归 Lab (New) -->
+                <div id="viz-multi" class="viz-scene absolute inset-0 flex flex-col opacity-0 pointer-events-none transition-all duration-500 justify-center">
+                    <div class="bg-gradient-to-br from-teal-500 to-emerald-600 rounded-3xl p-8 text-white shadow-xl mb-8 transform transition-transform hover:scale-105">
+                         <div class="text-teal-100 text-xs uppercase font-bold tracking-wider mb-2">Predicted Score</div>
+                         <div class="flex items-baseline gap-2">
+                            <div id="multi-result" class="text-7xl font-bold tracking-tighter">91.0</div>
+                            <span class="text-xl opacity-80">pts</span>
+                         </div>
+                         <div class="text-teal-100 text-sm mt-4 pt-4 border-t border-teal-400/30 font-mono opacity-80">
+                             Model: 50 + 5x₁ + 2x₂
+                         </div>
+                    </div>
+                    
+                    <div class="space-y-8 px-6">
+                         <div>
+                             <label class="flex justify-between text-sm font-bold text-gray-600 mb-3">
+                                 <span>Study Hours ($x_1$)</span>
+                                 <span id="val-x1" class="bg-gray-200 px-2 py-0.5 rounded text-gray-700 font-mono">5h</span>
+                             </label>
+                             <input type="range" id="input-x1" min="0" max="12" value="5" class="w-full accent-teal-600" oninput="updateMulti()">
+                         </div>
+                         <div>
+                             <label class="flex justify-between text-sm font-bold text-gray-600 mb-3">
+                                 <span>Sleep Hours ($x_2$)</span>
+                                 <span id="val-x2" class="bg-gray-200 px-2 py-0.5 rounded text-gray-700 font-mono">8h</span>
+                             </label>
+                             <input type="range" id="input-x2" min="0" max="12" value="8" class="w-full accent-emerald-600" oninput="updateMulti()">
+                         </div>
+                    </div>
+                </div>
+
+                <!-- 5. 数据变换 Lab (New) -->
+                <div id="viz-trans" class="viz-scene absolute inset-0 flex flex-col opacity-0 pointer-events-none transition-all duration-500">
+                    <div class="flex justify-center gap-4 mb-6">
+                        <button onclick="updateTrans('raw')" class="px-4 py-2 bg-gray-200 rounded-lg text-sm font-bold text-gray-600 hover:bg-gray-300 transition-colors focus:ring-2 focus:ring-gray-400">原始数据 (Raw)</button>
+                        <button onclick="updateTrans('log')" class="px-4 py-2 bg-orange-500 rounded-lg text-sm font-bold text-white shadow-lg shadow-orange-500/30 hover:bg-orange-600 transition-all focus:ring-2 focus:ring-orange-400">Log 变换</button>
+                    </div>
+                    <div class="flex-1 bg-white rounded-2xl shadow-inner p-4 mb-6 relative border border-gray-100">
+                        <canvas id="transChart"></canvas>
+                    </div>
+                    <div class="bg-orange-50 p-4 rounded-xl text-orange-800 text-sm text-center">
+                        <p id="trans-msg">👈 这是典型的右偏分布（如收入、反应时间）。</p>
+                    </div>
+                </div>
+
+                <!-- 6. 分类变量 Lab -->
+                <div id="viz-cat" class="viz-scene absolute inset-0 flex flex-col opacity-0 pointer-events-none transition-all duration-500">
+                    <div class="flex justify-center mb-6">
+                        <div class="bg-slate-100 p-1.5 rounded-xl flex space-x-1 shadow-inner">
+                            <button onclick="setRef('A')" class="ref-btn px-4 py-2 rounded-lg text-sm font-bold transition-all" data-target="A">Ref: A</button>
+                            <button onclick="setRef('B')" class="ref-btn px-4 py-2 rounded-lg text-sm font-bold transition-all" data-target="B">Ref: B</button>
+                            <button onclick="setRef('C')" class="ref-btn px-4 py-2 rounded-lg text-sm font-bold transition-all" data-target="C">Ref: C</button>
+                        </div>
+                    </div>
+
+                    <div class="flex-1 bg-white rounded-2xl shadow-inner p-4 mb-6 relative border border-gray-100">
+                        <canvas id="catChart"></canvas>
+                    </div>
+
+                    <div class="bg-slate-900 rounded-xl p-5 text-white shadow-lg transform transition-all hover:scale-[1.01]">
+                        <div class="text-xs text-slate-400 font-bold uppercase tracking-wider mb-2">Equation</div>
+                        <div id="cat-equation" class="font-mono text-lg text-green-400 break-all leading-relaxed font-bold">
+                            Loading...
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </aside>
+
+    <!-- Logic Script -->
+    <script>
+        // === 全局状态与配置 ===
+        let currentScene = 'desc';
+        const colors = { blue: '#0071E3', red: '#FF3B30', purple: '#AF52DE', green: '#34C759', gray: '#8E8E93', indigo: '#5856D6', orange: '#FF9500' };
+        Chart.defaults.font.family = "'Inter', sans-serif";
+        Chart.defaults.color = '#86868B';
+
+        // 辅助函数：正态分布
+        function normalDist(x, mean, sd) {
+            return (1 / (sd * Math.sqrt(2 * Math.PI))) * Math.exp(-0.5 * Math.pow((x - mean) / sd, 2));
+        }
+
+        // ==========================================
+        // 1. 描述性统计 Chart
+        // ==========================================
+        const descCtx = document.getElementById('descChart').getContext('2d');
+        const descChart = new Chart(descCtx, {
+            type: 'line',
+            data: {
+                labels: Array.from({length: 100}, (_, i) => i),
+                datasets: [{
+                    label: 'Distribution',
+                    data: [],
+                    borderColor: colors.blue,
+                    backgroundColor: 'rgba(0, 113, 227, 0.1)',
+                    borderWidth: 3,
+                    fill: true,
+                    pointRadius: 0,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { y: { display: false }, x: { display: false } },
+                plugins: { legend: { display: false } },
+                animation: { duration: 0 }
+            }
+        });
+
+        function updateDesc() {
+            const m = parseFloat(document.getElementById('input-mean').value);
+            const s = parseFloat(document.getElementById('input-sd').value);
+            document.getElementById('val-mean').innerText = m;
+            document.getElementById('val-sd').innerText = s;
+            
+            const data = Array.from({length: 100}, (_, x) => normalDist(x, m, s));
+            descChart.data.datasets[0].data = data;
+            descChart.update();
+        }
+
+        // ==========================================
+        // 2. 推断统计 Chart (Inferential)
+        // ==========================================
+        const infCtx = document.getElementById('infChart').getContext('2d');
+        const infChart = new Chart(infCtx, {
+            type: 'line',
+            data: {
+                labels: Array.from({length: 81}, (_, i) => (i - 40) / 10), // -4.0 to 4.0
+                datasets: [{
+                    label: 'T Distribution',
+                    data: [],
+                    borderColor: colors.indigo,
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    fill: true,
+                    segment: {
+                        borderColor: ctx => (Math.abs(ctx.p0.parsed.x) > 1.96) ? colors.red : colors.indigo,
+                        backgroundColor: ctx => (Math.abs(ctx.p0.parsed.x) > 1.96) ? 'rgba(255, 59, 48, 0.2)' : 'rgba(88, 86, 214, 0.05)',
+                    }
+                }, {
+                    label: 'Observed T',
+                    data: [],
+                    borderColor: '#1D1D1F',
+                    borderDash: [5, 5],
+                    borderWidth: 2,
+                    pointRadius: 6,
+                    pointBackgroundColor: '#1D1D1F',
+                    type: 'scatter'
+                }]
+            },
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false,
+                scales: { y: { display: false }, x: { grid: {display: false} } },
+                plugins: { legend: { display: false } }
+            }
+        });
+
+        function updateInf() {
+            const tVal = parseFloat(document.getElementById('input-t').value);
+            document.getElementById('val-t').innerText = tVal.toFixed(1);
+            
+            const distData = Array.from({length: 81}, (_, i) => {
+                const x = (i - 40) / 10;
+                return normalDist(x, 0, 1);
+            });
+            
+            // UI Logic
+            const resultBox = document.getElementById('inf-result-box');
+            const resultText = document.getElementById('inf-result-text');
+            if(Math.abs(tVal) > 1.96) {
+                resultBox.className = "bg-red-50 p-4 rounded-xl text-center mb-4 transition-colors duration-300";
+                resultText.innerText = "Significant Difference! (P < 0.05)";
+                resultText.className = "text-lg font-bold text-red-600";
+            } else {
+                resultBox.className = "bg-slate-50 p-4 rounded-xl text-center mb-4 transition-colors duration-300";
+                resultText.innerText = "Not Significant (P > 0.05)";
+                resultText.className = "text-lg font-bold text-gray-700";
+            }
+
+            infChart.data.datasets[0].data = distData;
+            infChart.data.datasets[1].data = [{x: tVal, y: normalDist(tVal, 0, 1)}];
+            infChart.update();
+        }
+
+        // ==========================================
+        // 3. 回归基础 Chart
+        // ==========================================
+        const regCtx = document.getElementById('regChart').getContext('2d');
+        const regChart = new Chart(regCtx, {
+            type: 'scatter',
+            data: {
+                datasets: [{
+                    label: 'Points',
+                    data: Array.from({length: 20}, (_, i) => ({x: i/2, y: i/2 + Math.random()*2})),
+                    backgroundColor: colors.gray,
+                    pointRadius: 4
+                }, {
+                    type: 'line',
+                    label: 'Model',
+                    data: [],
+                    borderColor: colors.red,
+                    borderWidth: 3,
+                    pointRadius: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { x: {min: 0, max: 10}, y: {min: -5, max: 15} },
+                plugins: { legend: { display: false } }
+            }
+        });
+
+        function updateReg() {
+            const b0 = parseFloat(document.getElementById('input-intercept').value);
+            const b1 = parseFloat(document.getElementById('input-slope').value);
+            document.getElementById('val-intercept').innerText = b0;
+            document.getElementById('val-slope').innerText = b1;
+            const line = [{x: 0, y: b0}, {x: 10, y: b0 + b1 * 10}];
+            regChart.data.datasets[1].data = line;
+            regChart.update();
+        }
+
+        // ==========================================
+        // 4. 多元回归 Logic (No Chart, Just UI)
+        // ==========================================
+        function updateMulti() {
+            const x1 = parseFloat(document.getElementById('input-x1').value);
+            const x2 = parseFloat(document.getElementById('input-x2').value);
+            document.getElementById('val-x1').innerText = x1 + 'h';
+            document.getElementById('val-x2').innerText = x2 + 'h';
+            // Model: 50 + 5x1 + 2x2
+            const pred = 50 + 5 * x1 + 2 * x2;
+            document.getElementById('multi-result').innerText = pred.toFixed(1);
+        }
+
+        // ==========================================
+        // 5. 数据变换 Chart
+        // ==========================================
+        const transCtx = document.getElementById('transChart').getContext('2d');
+        const skewRaw = Array.from({length: 40}, () => Math.floor(Math.exp(Math.random() * 2.2))); 
+        const skewLog = skewRaw.map(x => Math.log(x + 1));
+        
+        const transChart = new Chart(transCtx, {
+            type: 'bar',
+            data: {
+                labels: skewRaw.map((_, i) => i),
+                datasets: [{
+                    data: skewRaw,
+                    backgroundColor: '#9ca3af',
+                    borderRadius: 4
+                }]
+            },
+            options: { 
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } }, 
+                scales: { x: {display: false}, y: {beginAtZero: true} } 
+            }
+        });
+
+        function updateTrans(type) {
+            const msg = document.getElementById('trans-msg');
+            if(type === 'raw') {
+                transChart.data.datasets[0].data = skewRaw;
+                transChart.data.datasets[0].backgroundColor = '#9ca3af';
+                msg.innerText = "👈 这是典型的右偏分布（如收入、反应时间）。";
+                msg.className = "text-gray-600";
+            } else {
+                transChart.data.datasets[0].data = skewLog;
+                transChart.data.datasets[0].backgroundColor = colors.orange;
+                msg.innerText = "✨ Magic! Log 变换后，分布变得对称（正态）了。";
+                msg.className = "text-orange-700 font-bold";
+            }
+            transChart.update();
+        }
+
+        // ==========================================
+        // 6. 分类预测 Chart
+        // ==========================================
+        const catCtx = document.getElementById('catChart').getContext('2d');
+        const means = { A: 13.9, B: -20.8, C: 4.9 };
+        const genPts = (m) => Array.from({length: 15}, () => m + (Math.random()-0.5)*10);
+        const catData = { A: genPts(means.A), B: genPts(means.B), C: genPts(means.C) };
+
+        const catChart = new Chart(catCtx, {
+            type: 'scatter',
+            data: {
+                datasets: [
+                    { label: 'A', data: catData.A.map(y=>({x:0, y})), backgroundColor: colors.blue, pointRadius: 6 },
+                    { label: 'B', data: catData.B.map(y=>({x:1, y})), backgroundColor: colors.red, pointRadius: 6 },
+                    { label: 'C', data: catData.C.map(y=>({x:2, y})), backgroundColor: colors.green, pointRadius: 6 },
+                    { type: 'line', data: [], borderColor: colors.blue, borderDash: [5,5], borderWidth: 2, pointRadius: 0 }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: {
+                    x: { type: 'category', labels: ['Group A', 'Group B', 'Group C'], offset: true, grid: {display: false} },
+                    y: { grid: { color: '#F2F2F7' } }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+
+        function setRef(ref) {
+            // UI Update
+            document.querySelectorAll('.ref-btn').forEach(btn => {
+                if(btn.dataset.target === ref) {
+                    btn.className = "ref-btn px-4 py-2 rounded-lg text-sm font-bold bg-slate-900 text-white shadow-lg transition-all scale-105";
+                } else {
+                    btn.className = "ref-btn px-4 py-2 rounded-lg text-sm font-bold text-gray-500 hover:bg-white hover:shadow-sm transition-all";
+                }
+            });
+
+            // Logic
+            const intercept = means[ref];
+            const others = ['A', 'B', 'C'].filter(x => x !== ref);
+            const b1 = (means[others[0]] - means[ref]).toFixed(1);
+            const b2 = (means[others[1]] - means[ref]).toFixed(1);
+
+            catChart.data.datasets[3].data = [{x: 'Group A', y: intercept}, {x: 'Group C', y: intercept}];
+            catChart.update();
+
+            const eqHTML = `y = <span class="text-blue-400 font-bold">${intercept}</span> 
+                            + (<span class="text-red-400 font-bold">${b1}</span>)·${others[0]} 
+                            + (<span class="text-red-400 font-bold">${b2}</span>)·${others[1]}`;
+            document.getElementById('cat-equation').innerHTML = eqHTML;
+        }
+
+        // ==========================================
+        // Scrollytelling Engine
+        // ==========================================
+        const observerOptions = {
+            root: document.querySelector('main'),
+            rootMargin: '-45% 0px -45% 0px',
+            threshold: 0
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    document.querySelectorAll('.prose-section').forEach(el => el.classList.remove('active'));
+                    entry.target.classList.add('active');
+                    
+                    const targetViz = entry.target.dataset.viz;
+                    const vizTitle = {
+                        'desc': 'Descriptive Stats',
+                        'inf': 'Inferential Stats',
+                        'reg': 'Linear Model',
+                        'multi': 'Multiple Regression',
+                        'trans': 'Data Transformation',
+                        'cat': 'Categorical Predictors'
+                    };
+                    
+                    document.getElementById('viz-title').innerText = vizTitle[targetViz] || 'Laboratory';
+                    
+                    document.querySelectorAll('.viz-scene').forEach(el => {
+                        el.style.opacity = '0';
+                        el.style.pointerEvents = 'none';
+                    });
+                    const target = document.getElementById('viz-' + targetViz);
+                    if(target) {
+                        target.style.opacity = '1';
+                        target.style.pointerEvents = 'auto';
+                    }
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.prose-section').forEach(section => observer.observe(section));
+
+        // Event Listeners
+        document.getElementById('input-mean').addEventListener('input', updateDesc);
+        document.getElementById('input-sd').addEventListener('input', updateDesc);
+        document.getElementById('input-t').addEventListener('input', updateInf);
+        document.getElementById('input-slope').addEventListener('input', updateReg);
+        document.getElementById('input-intercept').addEventListener('input', updateReg);
+
+        // Init
+        updateDesc();
+        updateInf();
+        updateReg();
+        updateMulti();
+        updateTrans('raw');
+        setRef('A');
+
+    </script>
+</body>
+</html>
