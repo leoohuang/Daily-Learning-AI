@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>统计学中的分类预测变量 - 交互式教程</title>
+    <!-- 引入 Tailwind CSS 进行样式设计 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Chart.js 用于绘制图表 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- 引入 MathJax 用于显示数学公式 -->
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f3f4f6;
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transition: transform 0.2s;
+        }
+        .highlight-math {
+            background-color: #e0f2fe;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+            color: #0369a1;
+        }
+        .interactive-btn {
+            transition: all 0.2s;
+        }
+        .interactive-btn:active {
+            transform: scale(0.95);
+        }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <!-- 顶部导航 -->
+    <header class="bg-blue-600 text-white p-6 shadow-lg">
+        <div class="max-w-4xl mx-auto">
+            <h1 class="text-3xl font-bold">分类预测变量 (Categorical Predictors)</h1>
+            <p class="mt-2 text-blue-100">基于 Marcin Włodarczak 的课程讲义 - 交互式学习指南</p>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto p-4 space-y-8">
+
+        <!-- 第一部分：引言 -->
+        <section class="card p-6">
+            <h2 class="text-2xl font-bold mb-4 text-blue-700">1. 为什么要学这个？</h2>
+            <p class="mb-4">
+                在传统的线性回归中，我们习惯用数字预测数字（例如：用身高预测体重）。但当我们想要比较不同的<b>类别</b>（例如：实验组 vs 对照组）时，该怎么办？
+            </p>
+            <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 text-yellow-800">
+                <strong>核心挑战：</strong> 计算机只懂数字，不懂 "Group A" 或 "Group B"。我们需要一种翻译机制。
+            </div>
+        </section>
+
+        <!-- 第二部分：两个组与虚拟编码 -->
+        <section class="card p-6">
+            <h2 class="text-2xl font-bold mb-4 text-blue-700">2. 只有两个组：虚拟编码 (Dummy Coding)</h2>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                    <p class="mb-4 text-sm text-gray-600">我们将类别转换为开关信号：<br><b>Group A = 0</b> (基准), <b>Group B = 1</b> (比较组)。</p>
+                    <div class="bg-gray-100 p-4 rounded-lg mb-4">
+                        <h3 class="font-bold text-lg mb-2">回归方程：</h3>
+                        <p class="text-xl font-mono mb-2">$$y = 4.6 - 5.7x$$</p>
+                        <ul class="space-y-2 text-sm">
+                            <li><span class="highlight-math">截距 (4.6)</span>: 当 x=0 (Group A) 时的预测值，即 <b>A 的均值</b>。</li>
+                            <li><span class="highlight-math">斜率 (-5.7)</span>: 当 x 从 0 变 1 时 y 的变化量，即 <b>B 与 A 的均值差</b>。</li>
+                        </ul>
+                    </div>
+                    <div class="flex items-center space-x-2 bg-blue-50 p-3 rounded border border-blue-200">
+                        <span class="font-bold">尝试计算：</span>
+                        <span>如果我是 Group B (x=1)，我的值是多少？</span>
+                    </div>
+                    <p class="mt-2 text-gray-600 italic">答案：4.6 + (-5.7) × 1 = -1.1 (正是 B 的均值)</p>
+                </div>
+                <div class="relative h-64 w-full">
+                    <canvas id="chartTwoGroups"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- 第三部分：交互式多组实验室 -->
+        <section class="card p-6 border-2 border-blue-500">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-blue-700">3. 进阶实验：三个组与基准变换</h2>
+                <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded">交互演示</span>
+            </div>
+            
+            <p class="mb-4">
+                当有三个组 (A, B, C) 时，我们需要两个开关变量 ($x_1, x_2$)。最重要的是：<b>截距永远代表基准组的均值</b>。
+            </p>
+            <p class="mb-6 text-sm text-gray-500">
+                点击下方的按钮，改变“基准组”(Reference Group)，观察方程和图表如何实时变化。注意：数据点的实际位置（均值）不会变，但描述它们的数学语言会变！
+            </p>
+
+            <!-- 控制面板 -->
+            <div class="flex justify-center space-x-4 mb-6">
+                <button onclick="updateThreeGroups('A')" id="btn-ref-A" class="interactive-btn px-6 py-2 rounded-full font-bold bg-blue-600 text-white ring-2 ring-blue-300">
+                    设 A 为基准
+                </button>
+                <button onclick="updateThreeGroups('B')" id="btn-ref-B" class="interactive-btn px-6 py-2 rounded-full font-bold bg-gray-200 text-gray-700 hover:bg-gray-300">
+                    设 B 为基准
+                </button>
+                <button onclick="updateThreeGroups('C')" id="btn-ref-C" class="interactive-btn px-6 py-2 rounded-full font-bold bg-gray-200 text-gray-700 hover:bg-gray-300">
+                    设 C 为基准
+                </button>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-8">
+                <!-- 动态方程显示区 -->
+                <div class="bg-slate-800 text-white p-6 rounded-xl shadow-inner flex flex-col justify-center">
+                    <h3 class="text-gray-400 text-sm uppercase tracking-wider mb-2">当前模型方程</h3>
+                    <div id="equation-display" class="text-2xl font-mono mb-4 text-green-400">
+                        <!-- JS 将填充这里 -->
+                    </div>
+                    <div class="space-y-3 text-sm">
+                        <div class="flex justify-between border-b border-gray-600 pb-1">
+                            <span class="text-gray-400">截距 (Intercept)</span>
+                            <span id="val-intercept" class="font-bold text-white">Loading...</span>
+                        </div>
+                        <div class="flex justify-between border-b border-gray-600 pb-1">
+                            <span class="text-gray-400">变量 x₁ 系数</span>
+                            <span id="val-b1" class="font-bold text-white">Loading...</span>
+                        </div>
+                        <div class="flex justify-between border-b border-gray-600 pb-1">
+                            <span class="text-gray-400">变量 x₂ 系数</span>
+                            <span id="val-b2" class="font-bold text-white">Loading...</span>
+                        </div>
+                    </div>
+                    <div id="explanation-text" class="mt-4 text-xs text-yellow-300 italic">
+                        <!-- JS 解释 -->
+                    </div>
+                </div>
+
+                <!-- 图表区 -->
+                <div class="h-64 w-full">
+                    <canvas id="chartThreeGroups"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- 第四部分：总结与假设 -->
+        <section class="grid md:grid-cols-2 gap-6">
+            <div class="card p-6">
+                <h2 class="text-xl font-bold mb-3 text-blue-700">4. 统计假设 (Assumptions)</h2>
+                <ul class="list-disc pl-5 space-y-2 text-sm text-gray-700">
+                    <li><b>方差齐性 (Constant Variance)</b>: 所有组的数据分布宽度（波动）应该差不多。</li>
+                    <li><b>正态性 (Normality)</b>: 模型的预测误差（残差）应该符合正态分布。</li>
+                    <li><b>独立性 (Independence)</b>: 数据点之间互不影响。</li>
+                </ul>
+            </div>
+            <div class="card p-6 bg-blue-50 border-blue-100">
+                <h2 class="text-xl font-bold mb-3 text-blue-800">5. 极简复习小抄</h2>
+                <ul class="space-y-3 text-sm text-blue-900">
+                    <li class="flex items-start">
+                        <span class="bg-blue-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs mr-2 mt-0.5">1</span>
+                        <span><b>截距 (Intercept)</b> = 基准组的平均值。</span>
+                    </li>
+                    <li class="flex items-start">
+                        <span class="bg-blue-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs mr-2 mt-0.5">2</span>
+                        <span><b>斜率 (Slope)</b> = 该组与基准组的“均值差”。</span>
+                    </li>
+                    <li class="flex items-start">
+                        <span class="bg-blue-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs mr-2 mt-0.5">3</span>
+                        <span><b>多组比较</b> = 哪怕有100个组，也永远是“1个基准 + 99个相对于基准的差异”。</span>
+                    </li>
+                </ul>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="text-center p-6 text-gray-500 text-sm">
+        <p>Interactive Demo based on "Categorical Predictors" Slides</p>
+    </footer>
+
+    <script>
+        // === 数据准备 ===
+        // 模拟 PPT 中的数据
+        const groupA_Data = Array.from({length: 20}, () => 4.6 + (Math.random() - 0.5) * 5);
+        const groupB_Data = Array.from({length: 20}, () => -1.1 + (Math.random() - 0.5) * 5);
+        
+        // 3组数据 (PPT Slide 18 真实均值: A=13.9, B=-20.8, C=4.9)
+        const g3_A_mean = 13.9;
+        const g3_B_mean = -20.8;
+        const g3_C_mean = 4.9;
+        
+        const g3_A_pts = Array.from({length: 15}, () => g3_A_mean + (Math.random() - 0.5) * 8);
+        const g3_B_pts = Array.from({length: 15}, () => g3_B_mean + (Math.random() - 0.5) * 8);
+        const g3_C_pts = Array.from({length: 15}, () => g3_C_mean + (Math.random() - 0.5) * 8);
+
+        // === 图表 1: 两组比较 ===
+        const ctx2 = document.getElementById('chartTwoGroups').getContext('2d');
+        new Chart(ctx2, {
+            type: 'scatter',
+            data: {
+                datasets: [
+                    {
+                        label: 'Group A (0)',
+                        data: groupA_Data.map(y => ({x: 0 + (Math.random()-0.5)*0.1, y: y})), // 加一点抖动 x-jitter
+                        backgroundColor: 'rgba(54, 162, 235, 0.6)'
+                    },
+                    {
+                        label: 'Group B (1)',
+                        data: groupB_Data.map(y => ({x: 1 + (Math.random()-0.5)*0.1, y: y})),
+                        backgroundColor: 'rgba(255, 99, 132, 0.6)'
+                    },
+                    {
+                        type: 'line',
+                        label: '回归线',
+                        data: [{x:0, y:4.6}, {x:1, y:-1.1}],
+                        borderColor: 'black',
+                        borderWidth: 2,
+                        pointRadius: 6,
+                        pointBackgroundColor: 'red'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        type: 'linear',
+                        min: -0.5,
+                        max: 1.5,
+                        ticks: { stepSize: 1, callback: (v) => v === 0 ? '0 (Group A)' : v === 1 ? '1 (Group B)' : '' }
+                    },
+                    y: { title: {display: true, text: 'Outcome y'} }
+                },
+                plugins: {
+                    title: { display: true, text: '虚拟编码回归线: 连接两组均值' }
+                }
+            }
+        });
+
+        // === 图表 2: 三组比较 & 交互逻辑 ===
+        let currentRef = 'A';
+        const ctx3 = document.getElementById('chartThreeGroups').getContext('2d');
+        
+        const chart3 = new Chart(ctx3, {
+            type: 'scatter',
+            data: {
+                datasets: [
+                    { label: 'Group A', data: g3_A_pts.map(y => ({x: 0, y: y})), backgroundColor: 'rgba(54, 162, 235, 0.6)' },
+                    { label: 'Group B', data: g3_B_pts.map(y => ({x: 1, y: y})), backgroundColor: 'rgba(255, 99, 132, 0.6)' },
+                    { label: 'Group C', data: g3_C_pts.map(y => ({x: 2, y: y})), backgroundColor: 'rgba(75, 192, 192, 0.6)' },
+                    // 这是一个辅助线，用来显示“基准线”
+                    { 
+                        type: 'line', 
+                        label: '基准水平', 
+                        data: [], 
+                        borderColor: 'rgba(0,0,0,0.3)', 
+                        borderDash: [5, 5], 
+                        pointRadius: 0 
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { 
+                        type: 'category', 
+                        labels: ['Group A', 'Group B', 'Group C'],
+                        offset: true
+                    },
+                    y: { title: {display: true, text: 'Outcome y'} }
+                },
+                plugins: {
+                    tooltip: { enabled: false }
+                }
+            }
+        });
+
+        function updateThreeGroups(refGroup) {
+            currentRef = refGroup;
+            
+            // 样式更新
+            ['A', 'B', 'C'].forEach(g => {
+                const btn = document.getElementById(`btn-ref-${g}`);
+                if (g === refGroup) {
+                    btn.classList.remove('bg-gray-200', 'text-gray-700');
+                    btn.classList.add('bg-blue-600', 'text-white', 'ring-2', 'ring-blue-300');
+                } else {
+                    btn.classList.add('bg-gray-200', 'text-gray-700');
+                    btn.classList.remove('bg-blue-600', 'text-white', 'ring-2', 'ring-blue-300');
+                }
+            });
+
+            // 计算逻辑 (核心数学部分)
+            let intercept, b1, b2, eqStr, explStr;
+            let meanA = 13.9, meanB = -20.8, meanC = 4.9;
+
+            if (refGroup === 'A') {
+                intercept = meanA;
+                b1 = (meanB - meanA).toFixed(1); // B vs A
+                b2 = (meanC - meanA).toFixed(1); // C vs A
+                eqStr = `y = ${meanA} + (${b1})x₁ + (${b2})x₂`;
+                explStr = "基准是 A。x₁代表B与A的差，x₂代表C与A的差。";
+                
+                // 更新图表辅助线：在A的均值处画一条横线，体现“基准”
+                chart3.data.datasets[3].data = [{x: 'Group A', y: meanA}, {x: 'Group C', y: meanA}];
+            } 
+            else if (refGroup === 'B') {
+                intercept = meanB;
+                b1 = (meanA - meanB).toFixed(1); // A vs B
+                b2 = (meanC - meanB).toFixed(1); // C vs B
+                eqStr = `y = ${meanB} + (${b1})x₁ + (${b2})x₂`;
+                explStr = "基准变为了 B！截距变成了 B 的均值。系数变成了相对于 B 的差值。";
+                 // 更新图表辅助线
+                 chart3.data.datasets[3].data = [{x: 'Group A', y: meanB}, {x: 'Group C', y: meanB}];
+            } 
+            else if (refGroup === 'C') {
+                intercept = meanC;
+                b1 = (meanA - meanC).toFixed(1); // A vs C
+                b2 = (meanB - meanC).toFixed(1); // B vs C
+                eqStr = `y = ${meanC} + (${b1})x₁ + (${b2})x₂`;
+                explStr = "基准变为了 C！现在所有比较都是相对于 C 组进行的。";
+                 // 更新图表辅助线
+                 chart3.data.datasets[3].data = [{x: 'Group A', y: meanC}, {x: 'Group C', y: meanC}];
+            }
+
+            // 更新 DOM
+            document.getElementById('equation-display').innerText = eqStr;
+            document.getElementById('val-intercept').innerText = intercept;
+            document.getElementById('val-b1').innerText = b1;
+            document.getElementById('val-b2').innerText = b2;
+            document.getElementById('explanation-text').innerText = explStr;
+
+            chart3.update();
+        }
+
+        // 初始化
+        updateThreeGroups('A');
+
+    </script>
+</body>
+</html>
