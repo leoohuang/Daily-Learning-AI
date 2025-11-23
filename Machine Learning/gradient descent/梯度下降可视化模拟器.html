@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gradient Descent: The 3D Simulator (Pro)</title>
+    
+    <!-- 依赖库 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    
+    <!-- 字体 -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --accent: #0071E3;
+            --success: #34C759;
+            --danger: #FF453A;
+            --bg-dark: #000000;
+            --panel-bg: rgba(28, 28, 30, 0.95);
+        }
+        body { font-family: 'Inter', sans-serif; background: var(--bg-dark); color: white; overflow: hidden; }
+        
+        /* 玻璃拟态面板 */
+        .glass-panel {
+            background: var(--panel-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        }
+
+        /* 范围滑块样式 */
+        input[type=range] {
+            -webkit-appearance: none; width: 100%; background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; height: 16px; width: 16px;
+            border-radius: 50%; background: var(--accent);
+            cursor: pointer; margin-top: -6px; box-shadow: 0 0 10px var(--accent);
+            transition: background 0.3s;
+        }
+        input[type=range].danger-zone::-webkit-slider-thumb {
+            background: var(--danger); box-shadow: 0 0 15px var(--danger);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%; height: 4px; cursor: pointer;
+            background: #333; border-radius: 2px;
+        }
+
+        .btn-primary {
+            background: var(--accent); color: white;
+            padding: 8px 16px; border-radius: 8px; font-weight: 600;
+            transition: all 0.2s; text-align: center; cursor: pointer;
+        }
+        .btn-primary:hover { background: #0077ED; box-shadow: 0 0 15px rgba(0, 113, 227, 0.4); }
+        
+        .btn-secondary {
+            background: rgba(255,255,255,0.1); color: white;
+            padding: 8px 16px; border-radius: 8px; font-weight: 600;
+            transition: all 0.2s; text-align: center; cursor: pointer;
+        }
+        .btn-secondary:hover { background: rgba(255,255,255,0.2); }
+
+        .btn-success {
+            background: var(--success); color: white; pointer-events: none;
+            padding: 8px 16px; border-radius: 8px; font-weight: 600; text-align: center;
+        }
+        .btn-danger {
+            background: var(--danger); color: white; pointer-events: none;
+            padding: 8px 16px; border-radius: 8px; font-weight: 600; text-align: center;
+            animation: shake 0.5s;
+        }
+
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            50% { transform: translateX(5px); }
+            75% { transform: translateX(-5px); }
+            100% { transform: translateX(0); }
+        }
+
+        /* 提示 Toast */
+        .toast-overlay {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(20, 20, 20, 0.95); border: 1px solid var(--success);
+            padding: 2rem; border-radius: 20px; text-align: center;
+            box-shadow: 0 0 50px rgba(52, 199, 89, 0.2);
+            opacity: 0; pointer-events: none; transition: opacity 0.3s;
+            z-index: 50; min-width: 320px;
+        }
+        .toast-overlay.diverged {
+            border-color: var(--danger);
+            box-shadow: 0 0 50px rgba(255, 69, 58, 0.3);
+        }
+        .toast-overlay.show { opacity: 1; pointer-events: auto; }
+
+        #canvas-3d { width: 100%; height: 100%; display: block; }
+        .stat-value { font-family: 'JetBrains Mono', monospace; color: #4D9CFF; }
+        .stat-value.danger { color: #FF453A; }
+        .stat-value.success { color: #32D74B; }
+    </style>
+</head>
+<body class="flex h-screen w-screen">
+
+    <!-- 提示弹窗 -->
+    <div id="status-toast" class="toast-overlay backdrop-blur-xl">
+        <div class="text-6xl mb-4" id="toast-icon">🎉</div>
+        <h2 class="text-3xl font-bold text-white mb-2" id="toast-title">Converged!</h2>
+        <p class="text-gray-400 text-sm mb-6" id="toast-msg">Found the minimum cost point.</p>
+        
+        <div class="bg-gray-800/50 p-4 rounded-xl text-left space-y-2 text-sm font-mono mb-6 border border-white/10">
+            <div class="flex justify-between">
+                <span class="text-gray-500">Intercept (b)</span>
+                <span class="text-white" id="toast-b">0.00</span>
+            </div>
+            <div class="flex justify-between">
+                <span class="text-gray-500">Slope (m)</span>
+                <span class="text-white" id="toast-m">0.00</span>
+            </div>
+            <div class="flex justify-between border-t border-white/10 pt-2 mt-2">
+                <span class="text-gray-500">Final Cost</span>
+                <span class="" id="toast-cost">0.00</span>
+            </div>
+        </div>
+        
+        <button onclick="hideToast()" class="btn-secondary w-full border border-white/20 hover:bg-white/10">Close</button>
+    </div>
+
+    <!-- 左侧控制面板 -->
+    <aside class="w-96 flex flex-col p-6 z-20 glass-panel m-6 mr-0 h-[calc(100vh-3rem)] overflow-y-auto shrink-0">
+        
+        <div class="mb-8 border-b border-gray-700 pb-6">
+            <h1 class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">Gradient Descent</h1>
+            <p class="text-xs text-gray-400 mt-1 uppercase tracking-widest font-semibold">3D Visualization Engine Pro</p>
+        </div>
+
+        <!-- 1. 2D Chart -->
+        <div class="mb-8">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="text-sm font-bold text-gray-300">2D Data Fit</h3>
+                <span class="text-xs text-gray-500 font-mono">y = mx + b</span>
+            </div>
+            <div class="bg-white/5 rounded-xl p-2 h-40 border border-white/10">
+                <canvas id="chart2D"></canvas>
+            </div>
+        </div>
+
+        <!-- 2. 实时参数监控 -->
+        <div class="mb-8 bg-gray-800/40 rounded-2xl p-5 border border-white/5 shadow-inner backdrop-blur-sm">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider">Current State</h3>
+                <span id="status-badge" class="text-[10px] bg-gray-700 text-gray-300 px-2 py-1 rounded-md uppercase tracking-wider font-bold">Idle</span>
+            </div>
+            <div class="space-y-3 text-sm">
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-400">Intercept (b)</span>
+                    <span id="val-b" class="stat-value">0.00</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-400">Slope (m)</span>
+                    <span id="val-m" class="stat-value">0.00</span>
+                </div>
+                <div class="flex justify-between items-center pt-3 border-t border-white/10">
+                    <span class="text-gray-400">Cost (MSE)</span>
+                    <span id="val-cost" class="text-red-400 font-bold stat-value">0.00</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-400">Iteration</span>
+                    <span id="val-iter" class="text-gray-300 stat-value">0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. 控制器 -->
+        <div class="space-y-8 flex-1">
+            <div>
+                <label class="flex justify-between text-xs font-bold text-gray-300 mb-3">
+                    <span>Learning Rate ($\alpha$)</span>
+                    <span id="disp-lr" class="text-blue-400 font-mono text-sm bg-blue-400/10 px-2 py-0.5 rounded">0.05</span>
+                </label>
+                <!-- 升级：最大值 5.0，足够导致剧烈发散 -->
+                <input type="range" id="input-lr" min="0.01" max="5.0" step="0.01" value="0.05" class="group">
+                <div class="flex justify-between text-[9px] text-gray-500 mt-2 font-mono uppercase tracking-wide">
+                    <span>Safe (0.1)</span>
+                    <span class="text-yellow-500">Risky (1.5)</span>
+                    <span class="text-red-500">Explosive (3+)</span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <button id="btn-step" class="btn-secondary hover:bg-white/20">Single Step</button>
+                <button id="btn-auto" class="btn-primary shadow-lg shadow-blue-500/20">Auto Descend</button>
+                <button id="btn-reset" class="btn-secondary col-span-2 border border-white/10 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30 transition-colors">
+                    Reset Position
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- 右侧 3D 视图 -->
+    <main class="flex-1 relative bg-[#050505]">
+        <div id="canvas-container" class="w-full h-full"></div>
+        
+        <!-- 覆盖文字 -->
+        <div class="absolute top-8 right-8 glass-panel p-5 text-right pointer-events-none border-r-4 border-r-blue-500">
+            <h2 class="text-2xl font-bold text-white">Cost Landscape</h2>
+            <p class="text-sm text-gray-400 mt-1">Visualizing $J(\theta_0, \theta_1)$</p>
+        </div>
+    </main>
+
+    <script>
+        // ==========================================
+        // 1. Core Math Engine
+        // ==========================================
+        
+        const N_POINTS = 40;
+        // Generate normalized data centered at 0
+        const X_data = Array.from({length: N_POINTS}, () => (Math.random() * 2 - 1)); 
+        const Y_data = X_data.map(x => 0.5 * x - 0.3 + (Math.random() * 0.2 - 0.1)); 
+
+        function computeCost(b, m) {
+            let sumError = 0;
+            for(let i=0; i<N_POINTS; i++) {
+                const y_pred = m * X_data[i] + b;
+                sumError += Math.pow(y_pred - Y_data[i], 2);
+            }
+            return sumError / (2 * N_POINTS);
+        }
+
+        function computeGradients(b, m) {
+            let db = 0, dm = 0;
+            for(let i=0; i<N_POINTS; i++) {
+                const error = (m * X_data[i] + b) - Y_data[i];
+                db += error;
+                dm += error * X_data[i];
+            }
+            return { db: db / N_POINTS, dm: dm / N_POINTS };
+        }
+
+        // Simulation State
+        let currentB = 0.9, currentM = -0.9; // Start far away
+        let currentCost = computeCost(currentB, currentM);
+        let iteration = 0;
+        let learningRate = 0.05;
+        let isPlaying = false;
+        let isConverged = false;
+        let isDiverged = false;
+        let pathHistory = [];
+
+        // ==========================================
+        // 2. 2D Chart (Data View)
+        // ==========================================
+        const ctx2d = document.getElementById('chart2D').getContext('2d');
+        const chart2D = new Chart(ctx2d, {
+            type: 'scatter',
+            data: {
+                datasets: [
+                    {
+                        label: 'Data',
+                        data: X_data.map((x, i) => ({x: x, y: Y_data[i]})),
+                        backgroundColor: 'rgba(255, 255, 255, 0.4)',
+                        pointRadius: 2,
+                        borderWidth: 0
+                    },
+                    {
+                        label: 'Fit',
+                        data: [],
+                        type: 'line',
+                        borderColor: '#0071E3',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        tension: 0
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { grid: { color: '#333', drawBorder: false }, ticks: { display: false } },
+                    y: { grid: { color: '#333', drawBorder: false }, ticks: { display: false } }
+                },
+                animation: { duration: 0 }
+            }
+        });
+
+        function update2DChart() {
+            // If values are too crazy (Diverged), hide line to prevent rendering errors
+            if (Math.abs(currentM) > 50 || Math.abs(currentB) > 50) {
+                chart2D.data.datasets[1].data = [];
+            } else {
+                chart2D.data.datasets[1].data = [
+                    { x: -1.2, y: currentM * -1.2 + currentB },
+                    { x: 1.2, y: currentM * 1.2 + currentB }
+                ];
+            }
+            chart2D.update();
+        }
+
+        // ==========================================
+        // 3. 3D Visualization (Three.js)
+        // ==========================================
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x050505, 0.03); // Add fog for depth
+        
+        const camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 2000);
+        camera.position.set(3.5, 2.5, 3.5); 
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0x404040, 4);
+        scene.add(ambientLight);
+        
+        const spotLight = new THREE.SpotLight(0xffffff, 1);
+        spotLight.position.set(5, 10, 5);
+        spotLight.castShadow = true;
+        spotLight.shadow.mapSize.width = 1024;
+        spotLight.shadow.mapSize.height = 1024;
+        scene.add(spotLight);
+
+        // --- 1. Cost Surface (The Bowl) ---
+        // Increase range slightly to allow seeing "escape"
+        const RANGE = 2.5; 
+        const geometry = new THREE.PlaneGeometry(RANGE * 2, RANGE * 2, 64, 64);
+        const count = geometry.attributes.position.count;
+        const colors = [];
+        const colorObj = new THREE.Color();
+
+        for (let i = 0; i < count; i++) {
+            const x = geometry.attributes.position.getX(i); // m
+            const y = geometry.attributes.position.getY(i); // b
+            const z = computeCost(y, x); // Cost
+            
+            // Visual Height Scaling
+            geometry.attributes.position.setZ(i, z * 2.0); 
+
+            // Color Map: Dark Blue (Low) -> Cyan -> Purple -> Red (High)
+            const t = Math.min(z * 0.8, 1); 
+            if(t < 0.5) {
+                colorObj.setHSL(0.6, 1, 0.2 + t); // Blueish
+            } else {
+                colorObj.setHSL(0.9 - t * 0.3, 1, 0.5); // Reddish
+            }
+            colors.push(colorObj.r, colorObj.g, colorObj.b);
+        }
+        geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+        geometry.computeVertexNormals();
+
+        const material = new THREE.MeshStandardMaterial({ 
+            vertexColors: true, 
+            side: THREE.DoubleSide, 
+            roughness: 0.4,
+            metalness: 0.2
+        });
+        const surfaceMesh = new THREE.Mesh(geometry, material);
+        surfaceMesh.rotation.x = -Math.PI / 2;
+        surfaceMesh.receiveShadow = true;
+        scene.add(surfaceMesh);
+
+        // --- 2. Grid Overlay ---
+        const wireGeo = new THREE.WireframeGeometry(geometry);
+        const wireMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.03 });
+        const wireMesh = new THREE.LineSegments(wireGeo, wireMat);
+        wireMesh.rotation.x = -Math.PI / 2;
+        wireMesh.position.y = 0.01; // Prevent z-fighting
+        scene.add(wireMesh);
+
+        // --- 3. The Ball (Parameters) ---
+        const sphereGeo = new THREE.SphereGeometry(0.06, 32, 32);
+        const sphereMat = new THREE.MeshStandardMaterial({ 
+            color: 0xffffff, 
+            emissive: 0x0071E3, 
+            emissiveIntensity: 0.8,
+            roughness: 0.1
+        });
+        const ball = new THREE.Mesh(sphereGeo, sphereMat);
+        ball.castShadow = true;
+        scene.add(ball);
+
+        // --- 4. Trail ---
+        // Use a max-length buffer geometry for performance
+        const MAX_POINTS = 2000;
+        const pathGeo = new THREE.BufferGeometry();
+        const positions = new Float32Array(MAX_POINTS * 3);
+        pathGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        pathGeo.setDrawRange(0, 0);
+        
+        const pathMat = new THREE.LineBasicMaterial({ color: 0x00E0FF, linewidth: 2, opacity: 0.6, transparent: true });
+        const pathLine = new THREE.Line(pathGeo, pathMat);
+        scene.add(pathLine);
+
+        // ==========================================
+        // 4. Simulation Loop & Updates
+        // ==========================================
+
+        function syncVisuals() {
+            // Coordinate Mapping:
+            // World X = m (Slope)
+            // World Z = -b (Intercept, inverted Y from plane gen)
+            // World Y = Cost * 2.0 (Visual Height)
+            
+            const visualHeight = currentCost * 2.0; 
+            
+            ball.position.set(currentM, visualHeight + 0.06, -currentB);
+            
+            // Update Trail
+            if (!isDiverged) {
+                pathHistory.push(ball.position.x, ball.position.y, ball.position.z);
+                
+                // Limit trail length
+                if (pathHistory.length > MAX_POINTS * 3) {
+                    pathHistory = pathHistory.slice(-MAX_POINTS * 3);
+                }
+
+                const positions = pathLine.geometry.attributes.position.array;
+                const len = pathHistory.length;
+                for(let i=0; i<len; i++) {
+                    positions[i] = pathHistory[i];
+                }
+                pathLine.geometry.attributes.position.needsUpdate = true;
+                pathLine.geometry.setDrawRange(0, len / 3);
+            }
+
+            // Ball Appearance Logic
+            if(isConverged) {
+                ball.material.emissive.setHex(0x34C759); // Green
+                ball.material.color.setHex(0x34C759);
+                ball.scale.setScalar(1.5); // Pulse size
+            } else if(isDiverged) {
+                ball.material.emissive.setHex(0xFF453A); // Red
+                ball.material.color.setHex(0xFF453A);
+                ball.scale.setScalar(2.0);
+            } else {
+                ball.material.emissive.setHex(0x0071E3); // Blue
+                ball.material.color.setHex(0xffffff);
+                ball.scale.setScalar(1.0);
+            }
+        }
+
+        function performStep() {
+            if(isConverged || isDiverged) return;
+
+            const prevCost = currentCost;
+            const grads = computeGradients(currentB, currentM);
+            
+            // Update Parameters
+            currentB -= learningRate * grads.db;
+            currentM -= learningRate * grads.dm;
+            currentCost = computeCost(currentB, currentM);
+            iteration++;
+
+            // --- CRITICAL LOGIC FIX ---
+            
+            // 1. DIVERGENCE CHECK (Has it exploded?)
+            // Trigger if cost exceeds visual bounds (50 is high enough)
+            if (currentCost > 50 || isNaN(currentCost)) {
+                isDiverged = true;
+                isPlaying = false;
+                showDivergence();
+                updateStatus("Diverged");
+            }
+            // 2. CONVERGENCE CHECK (Is it actually at the bottom?)
+            // Condition 1: Change is very small
+            // Condition 2: Cost is reasonably small (Prevent false positives at high altitude)
+            else if (Math.abs(prevCost - currentCost) < 1e-5 && currentCost < 1.0) {
+                isConverged = true;
+                isPlaying = false;
+                showSuccess();
+                updateStatus("Converged");
+            }
+
+            updateUI();
+            syncVisuals();
+            update2DChart();
+        }
+
+        function updateUI() {
+            document.getElementById('val-b').innerText = currentB.toFixed(4);
+            document.getElementById('val-m').innerText = currentM.toFixed(4);
+            
+            const costEl = document.getElementById('val-cost');
+            if (currentCost > 1000) {
+                costEl.innerText = "∞";
+                costEl.className = "stat-value danger font-bold text-lg";
+            } else {
+                costEl.innerText = currentCost.toFixed(5);
+                costEl.className = isConverged ? "stat-value success font-bold" : "stat-value text-red-400 font-bold";
+            }
+            
+            document.getElementById('val-iter').innerText = iteration;
+        }
+
+        function updateStatus(state) {
+            const badge = document.getElementById('status-badge');
+            const btn = document.getElementById('btn-auto');
+            
+            if(state === "Running") {
+                badge.innerText = "Running";
+                badge.className = "text-[10px] bg-blue-900 text-blue-200 px-2 py-1 rounded-md uppercase tracking-wider font-bold animate-pulse";
+                btn.innerText = "Pause";
+                btn.className = "btn-primary shadow-lg shadow-blue-500/20";
+            } else if (state === "Converged") {
+                badge.innerText = "Converged";
+                badge.className = "text-[10px] bg-green-900 text-green-200 px-2 py-1 rounded-md uppercase tracking-wider font-bold";
+                btn.innerText = "Done";
+                btn.className = "btn-success opacity-50 cursor-not-allowed"; 
+            } else if (state === "Diverged") {
+                badge.innerText = "EXPLODED";
+                badge.className = "text-[10px] bg-red-900 text-red-200 px-2 py-1 rounded-md uppercase tracking-wider font-bold animate-bounce";
+                btn.innerText = "Failed";
+                btn.className = "btn-danger opacity-50 cursor-not-allowed"; 
+            } else {
+                badge.innerText = "Idle";
+                badge.className = "text-[10px] bg-gray-700 text-gray-300 px-2 py-1 rounded-md uppercase tracking-wider font-bold";
+                btn.innerText = "Auto Descend";
+                btn.className = "btn-secondary";
+            }
+        }
+
+        function showSuccess() {
+            const t = document.getElementById('status-toast');
+            t.classList.remove('diverged');
+            document.getElementById('toast-icon').innerText = "🎉";
+            document.getElementById('toast-title').innerText = "Converged!";
+            document.getElementById('toast-msg').innerText = "Successfully found the minimum.";
+            document.getElementById('toast-cost').className = "text-right text-green-400 font-bold";
+            
+            fillToastData();
+            t.classList.add('show');
+        }
+
+        function showDivergence() {
+            const t = document.getElementById('status-toast');
+            t.classList.add('diverged');
+            document.getElementById('toast-icon').innerText = "💥";
+            document.getElementById('toast-title').innerText = "Diverged!";
+            document.getElementById('toast-msg').innerText = "Learning Rate too high. Parameters exploded to infinity.";
+            document.getElementById('toast-cost').className = "text-right text-red-500 font-bold";
+            
+            // Fill with visual infinity
+            document.getElementById('toast-b').innerText = "NaN";
+            document.getElementById('toast-m').innerText = "NaN";
+            document.getElementById('toast-cost').innerText = "∞";
+            
+            t.classList.add('show');
+        }
+
+        function fillToastData() {
+            document.getElementById('toast-b').innerText = currentB.toFixed(4);
+            document.getElementById('toast-m').innerText = currentM.toFixed(4);
+            document.getElementById('toast-cost').innerText = currentCost.toFixed(5);
+        }
+
+        window.hideToast = function() {
+            document.getElementById('status-toast').classList.remove('show');
+        }
+
+        // ==========================================
+        // 5. Animation & Events
+        // ==========================================
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            if(isPlaying) performStep();
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // Button Listeners
+        document.getElementById('btn-step').addEventListener('click', () => {
+            isPlaying = false;
+            if(isConverged || isDiverged) return; 
+            updateStatus("Idle");
+            performStep();
+        });
+
+        document.getElementById('btn-auto').addEventListener('click', function() {
+            if(isConverged || isDiverged) return; 
+            isPlaying = !isPlaying;
+            updateStatus(isPlaying ? "Running" : "Idle");
+        });
+
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            // Reset State
+            currentB = (Math.random() * 2 - 1) * 0.8; // Keep within view initially
+            currentM = (Math.random() * 2 - 1) * 0.8;
+            iteration = 0;
+            currentCost = computeCost(currentB, currentM);
+            
+            isConverged = false;
+            isDiverged = false;
+            isPlaying = false;
+            
+            // Clear Trail
+            pathHistory = [];
+            pathLine.geometry.setDrawRange(0, 0);
+            
+            hideToast();
+            updateStatus("Idle");
+            updateUI();
+            syncVisuals();
+            update2DChart();
+            
+            // Reset Camera Target if lost
+            controls.target.set(0,0,0);
+        });
+
+        // Learning Rate Slider Logic
+        const lrInput = document.getElementById('input-lr');
+        const lrDisp = document.getElementById('disp-lr');
+        
+        lrInput.addEventListener('input', function() {
+            learningRate = parseFloat(this.value);
+            lrDisp.innerText = learningRate.toFixed(2);
+            
+            if(learningRate > 1.5) {
+                this.classList.add('danger-zone');
+                lrDisp.className = "text-red-500 font-mono text-sm bg-red-500/10 px-2 py-0.5 rounded font-bold animate-pulse";
+                lrDisp.innerText += " ⚠️";
+            } else if (learningRate > 0.5) {
+                this.classList.remove('danger-zone');
+                lrDisp.className = "text-yellow-400 font-mono text-sm bg-yellow-400/10 px-2 py-0.5 rounded";
+            } else {
+                this.classList.remove('danger-zone');
+                lrDisp.className = "text-blue-400 font-mono text-sm bg-blue-400/10 px-2 py-0.5 rounded";
+            }
+        });
+
+        // Initial Setup
+        syncVisuals();
+        update2DChart();
+        updateUI();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        });
+
+    </script>
+</body>
+</html>

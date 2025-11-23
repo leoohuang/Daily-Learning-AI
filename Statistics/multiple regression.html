@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lab 06: Multiple Regression & Diagnostics</title>
+    
+    <!-- 核心库 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjs@11.8.0/lib/browser/math.js"></script> <!-- 引入 Math.js 用于矩阵运算 -->
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    
+    <!-- 字体 -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --accent: #0071E3;
+            --bg-code: #1e1e1e;
+            --text-code: #d4d4d4;
+        }
+        body { font-family: 'Inter', sans-serif; background: #F5F5F7; color: #1d1d1f; }
+        
+        /* 滚动叙事布局 */
+        .prose-section {
+            min-height: 80vh;
+            padding: 4rem 2rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            opacity: 0.3;
+            transition: opacity 0.5s ease;
+            border-left: 4px solid transparent;
+        }
+        .prose-section.active { opacity: 1; border-left-color: var(--accent); }
+
+        /* R 代码块风格 */
+        .r-chunk {
+            background: var(--bg-code);
+            border-radius: 12px;
+            overflow: hidden;
+            margin: 1.5rem 0;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+        }
+        .r-header {
+            background: #252526;
+            padding: 8px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #333;
+        }
+        .r-code {
+            padding: 16px;
+            color: var(--text-code);
+            white-space: pre-wrap;
+        }
+        .r-output {
+            background: #111;
+            color: #ccc;
+            padding: 16px;
+            border-top: 1px solid #333;
+            font-family: 'JetBrains Mono', monospace;
+            white-space: pre;
+            display: none; /* 默认隐藏，点击运行后显示 */
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .run-btn {
+            background: #238636;
+            color: white;
+            border: none;
+            padding: 4px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        .run-btn:hover { background: #2ea043; }
+        .run-btn:active { transform: scale(0.95); }
+
+        /* 关键词高亮 */
+        .hl-func { color: #dcdcaa; }
+        .hl-num { color: #b5cea8; }
+        .hl-str { color: #ce9178; }
+        .hl-key { color: #569cd6; }
+
+        /* 右侧面板 */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 24px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.08);
+            border: 1px solid rgba(0,0,0,0.05);
+        }
+        
+        .viz-scene {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.4s;
+            display: flex;
+            flex-direction: column;
+            padding: 2rem;
+        }
+        .viz-scene.active { opacity: 1; pointer-events: auto; }
+
+        /* 章节标签 */
+        .chapter-tag {
+            font-size: 0.75rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--accent);
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+    </style>
+</head>
+<body class="flex flex-col lg:flex-row h-screen overflow-hidden">
+
+    <!-- 左侧：教材内容 -->
+    <main class="lg:w-1/2 h-full overflow-y-auto scroll-smooth relative z-10 bg-white">
+        <div class="max-w-2xl mx-auto pb-32 px-6">
+            
+            <!-- 封面 -->
+            <section class="min-h-[80vh] flex flex-col justify-center">
+                <p class="text-blue-600 font-bold tracking-wider uppercase mb-4 text-sm">Interactive Lab 06</p>
+                <h1 class="text-5xl font-extrabold tracking-tight mb-6 text-slate-900 leading-tight">
+                    多重回归与<br>模型诊断
+                </h1>
+                <p class="text-xl text-slate-500 leading-relaxed mb-8">
+                    基于 Marcin Włodarczak 的实验讲义。我们将探索从简单回归到多重回归的飞跃，深入理解数据变换、共线性以及模型背后的假设。
+                </p>
+                <div class="flex items-center text-sm text-slate-400 gap-2">
+                    <svg class="w-5 h-5 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>
+                    <span>Scroll to Start</span>
+                </div>
+            </section>
+
+            <!-- 1. 简单回归 (Simple Regression) -->
+            <section id="sec-simple" class="prose-section active" data-viz="viz-simple">
+                <span class="chapter-tag">Part 1</span>
+                <h2 class="text-3xl font-bold mb-4">简单回归回顾</h2>
+                <p class="text-slate-600 mb-4">
+                    我们先从单预测变量模型开始。这里我们生成了一组数据 <code>d1</code>，其中 $y$ 是 $x$ 的函数加上一些噪声。
+                </p>
+                <div class="r-chunk">
+                    <div class="r-header"><span>R Console</span><button class="run-btn" onclick="runSimpleReg()">Run</button></div>
+                    <div class="r-code"><span class="hl-func">library</span>('tidyverse')
+d1 <- <span class="hl-func">tibble</span>(x = <span class="hl-func">runif</span>(50, -5, 5),
+             y = 5 + -9 * x + <span class="hl-func">rnorm</span>(50, 0, 1))
+model1 <- <span class="hl-func">lm</span>(y ~ x, data = d1)
+<span class="hl-func">summary</span>(model1)</div>
+                    <div class="r-output" id="out-simple"></div>
+                </div>
+                <p class="text-slate-600 text-sm mt-4">
+                    <strong>观察点：</strong> 截距 (Intercept) 应接近 5，斜率 (x) 应接近 -9。$R^2$ 非常高，因为噪声很小。
+                </p>
+            </section>
+
+            <!-- 2. 多重回归 (Multiple Regression) -->
+            <section id="sec-multi" class="prose-section" data-viz="viz-multi">
+                <span class="chapter-tag">Part 2</span>
+                <h2 class="text-3xl font-bold mb-4">引入第二个变量</h2>
+                <p class="text-slate-600 mb-4">
+                    生活很少如此简单。通常 $y$ 取决于多个变量。这里我们引入 $x_1$ 和 $x_2$。
+                    如果我们只看 $y \sim x_1$ 或 $y \sim x_2$，我们可能会得到误导性的图像（即 omitted variable bias，虽然在此例中设定为独立，影响较小）。
+                </p>
+                <p class="text-slate-600 mb-4">
+                    <strong>正确的做法</strong>是将所有预测变量放入同一个模型中：
+                </p>
+                <div class="r-chunk">
+                    <div class="r-header"><span>R Console</span><button class="run-btn" onclick="runMultiReg()">Run</button></div>
+                    <div class="r-code">d2 <- <span class="hl-func">tibble</span>(
+  x1 = <span class="hl-func">runif</span>(20, 13, 27),
+  x2 = <span class="hl-func">runif</span>(20, -3, 11),
+  y = -26 - 6 * x1 + 7 * x2 + <span class="hl-func">rnorm</span>(20)
+)
+
+<span class="hl-key"># Multiple Regression</span>
+m3 <- <span class="hl-func">lm</span>(y ~ x1 + x2, data = d2)
+<span class="hl-func">summary</span>(m3)</div>
+                    <div class="r-output" id="out-multi"></div>
+                </div>
+                <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mt-4">
+                    <h4 class="font-bold text-blue-800 text-sm">系数解读</h4>
+                    <ul class="list-disc ml-4 text-sm text-blue-900 mt-2 space-y-1">
+                        <li><strong>Intercept:</strong> 当 $x_1=0, x_2=0$ 时的 $y$ 值。</li>
+                        <li><strong>x1:</strong> 当 $x_2$ 保持不变时，$x_1$ 增加 1 单位带来的 $y$ 变化。</li>
+                        <li><strong>x2:</strong> 当 $x_1$ 保持不变时，$x_2$ 增加 1 单位带来的 $y$ 变化。</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- 3. 练习：Beginning Readers -->
+            <section id="sec-exercise" class="prose-section" data-viz="viz-exercise">
+                <span class="chapter-tag">Part 3: Exercise</span>
+                <h2 class="text-3xl font-bold mb-4">实战：阅读反应时</h2>
+                <p class="text-slate-600 mb-4">
+                    我们使用 <code>beginningReaders</code> 数据集。首先汇总每个单词的频率 (Freq)、长度 (OrthLength) 和平均反应时 (RT)。
+                </p>
+                <p class="text-slate-600 mb-4">
+                    <strong>任务：</strong> 比较仅使用频率的模型与同时使用频率和长度的模型。
+                </p>
+                <div class="r-chunk">
+                    <div class="r-header"><span>R Console</span><button class="run-btn" onclick="runExercise()">Run Comparison</button></div>
+                    <div class="r-code"><span class="hl-key"># Model 1: RT ~ Freq</span>
+m_freq <- <span class="hl-func">lm</span>(RT ~ Freq, data = words)
+
+<span class="hl-key"># Model 2: RT ~ Freq + OrthLength</span>
+m_both <- <span class="hl-func">lm</span>(RT ~ Freq + OrthLength, data = words)
+
+<span class="hl-func">cat</span>("R2 (Freq only):", <span class="hl-func">summary</span>(m_freq)$r.squared, "\n")
+<span class="hl-func">cat</span>("R2 (Both):     ", <span class="hl-func">summary</span>(m_both)$r.squared)</div>
+                    <div class="r-output" id="out-exercise"></div>
+                </div>
+                <p class="text-slate-600 text-sm mt-4">
+                    通常，增加单词长度（OrthLength）会提高 $R^2$，因为长单词往往读起来更慢，这是频率之外的额外信息。
+                </p>
+            </section>
+
+            <!-- 4. 标准化 (Standardization) -->
+            <section id="sec-std" class="prose-section" data-viz="viz-std">
+                <span class="chapter-tag">Part 4</span>
+                <h2 class="text-3xl font-bold mb-4">非标准化系数的陷阱</h2>
+                <p class="text-slate-600 mb-4">
+                    如果 $x_1$ 的范围是 0-1，$x_2$ 的范围是 0-1000，它们的系数大小会相差巨大，但这不代表重要性。
+                </p>
+                <p class="text-slate-600 mb-4">
+                    <strong>解决方案：</strong> 标准化 (z-score)。将所有预测变量转换为标准差单位。
+                </p>
+                <div class="math-block bg-white p-4 rounded shadow-sm text-center my-4 font-mono text-sm">
+                    x_z = (x - mean(x)) / sd(x)
+                </div>
+                <div class="r-chunk">
+                    <div class="r-header"><span>R Console</span><button class="run-btn" onclick="runStd()">Run Scaled Model</button></div>
+                    <div class="r-code">d2 <- d2 %>%
+  <span class="hl-func">mutate</span>(x1_z = <span class="hl-func">scale</span>(x1),
+         x2_z = <span class="hl-func">scale</span>(x2))
+
+m_std <- <span class="hl-func">lm</span>(y ~ x1_z + x2_z, data = d2)
+<span class="hl-func">summary</span>(m_std)</div>
+                    <div class="r-output" id="out-std"></div>
+                </div>
+                <p class="text-slate-600 text-sm">
+                    注意：标准化后，$R^2$ 和 $p$ 值保持不变，但系数 (Estimates) 现在可以直接比较大小了。
+                </p>
+            </section>
+
+            <!-- 5. 模型诊断 (Diagnostics) -->
+            <section id="sec-diag" class="prose-section" data-viz="viz-diag">
+                <span class="chapter-tag">Part 5</span>
+                <h2 class="text-3xl font-bold mb-4">模型诊断</h2>
+                <p class="text-slate-600 mb-4">
+                    模型拟合好并不代表它是对的。我们需要检查假设：
+                </p>
+                <ul class="space-y-4 mb-6">
+                    <li class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                        <strong class="text-indigo-600 block mb-1">1. 残差正态性 (Normality)</strong>
+                        <span class="text-slate-600 text-sm">残差分布应呈钟形曲线。通过直方图或 Q-Q 图检查。</span>
+                    </li>
+                    <li class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                        <strong class="text-indigo-600 block mb-1">2. 同方差性 (Homoscedasticity)</strong>
+                        <span class="text-slate-600 text-sm">残差的离散程度不应随预测值变化。Residuals vs Fitted 图中不应出现喇叭口形状。</span>
+                    </li>
+                </ul>
+                <p class="text-slate-600 text-sm">
+                    右侧展示了交互式的诊断图。尝试生成不同噪声的数据来观察图形变化。
+                </p>
+            </section>
+
+            <!-- 6. 独立性与层级模型 -->
+            <section id="sec-indep" class="prose-section" data-viz="viz-indep">
+                <span class="chapter-tag">Part 6</span>
+                <h2 class="text-3xl font-bold mb-4">独立性假设</h2>
+                <p class="text-slate-600 mb-4">
+                    线性回归假设所有数据点都是独立的。但在 <code>beginningReaders</code> 中，每个受试者 (Subject) 贡献了多个数据点。
+                </p>
+                <div class="r-chunk">
+                    <div class="r-header"><span>R Console</span></div>
+                    <div class="r-code"><span class="hl-func">table</span>(beginningReaders$Subject)</div>
+                    <div class="r-output" style="display:block; max-height: 150px;">S10 S12 S13 S14 ...
+160 153 174 118 ...</div>
+                </div>
+                <p class="text-slate-600 mb-4">
+                    <strong>后果：</strong> 模型会对自己太“自信”（低估标准误）。<br>
+                    <strong>解法：</strong> 使用混合效应模型 (Mixed-effects models)，这将在后续课程（第14-15章）中讲解。
+                </p>
+            </section>
+
+            <!-- 7. 共线性 (Correlated Predictors) -->
+            <section id="sec-collin" class="prose-section" data-viz="viz-collin">
+                <span class="chapter-tag">Part 7: Advanced</span>
+                <h2 class="text-3xl font-bold mb-4">共线性的诅咒</h2>
+                <p class="text-slate-600 mb-4">
+                    当预测变量之间高度相关（例如 $x_1$ 和 $x_2$ 的 correlation = 0.95）时，模型很难区分它们各自的贡献。
+                </p>
+                <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
+                    <h4 class="font-bold text-red-800 text-sm">表现</h4>
+                    <p class="text-red-900 text-sm">
+                        1. 系数估计值变得不稳定（方差膨胀）。<br>
+                        2. 单独看 $x_1$ 显著，单独看 $x_2$ 显著，放一起都不显著，或者系数符号反转。
+                    </p>
+                </div>
+                <p class="text-slate-600">
+                    在右侧实验室中，尝试增加相关系数 $\rho$，观察 $x_1$ 和 $x_2$ 的估计系数如何变得疯狂跳动。
+                </p>
+            </section>
+
+            <!-- 8. Adjusted R2 -->
+            <section id="sec-r2" class="prose-section" data-viz="viz-r2">
+                <span class="chapter-tag">Part 8</span>
+                <h2 class="text-3xl font-bold mb-4">校正 $R^2$</h2>
+                <p class="text-slate-600 mb-4">
+                    这就引出了一个问题：我们是不是应该无脑加变量？
+                </p>
+                <p class="text-slate-600 mb-4">
+                    <strong>事实：</strong> 只要增加变量（哪怕是完全随机的噪声），$R^2$ 永远会上升（或不变），绝不会下降。
+                </p>
+                <p class="text-slate-600 mb-4">
+                    <strong>解法：</strong> 使用 <strong>Adjusted $R^2$</strong>。它引入了惩罚项，如果新变量没有解释足够多的方差，Adjusted $R^2$ 会下降。
+                </p>
+                <div class="r-chunk">
+                    <div class="r-header"><span>R Console</span><button class="run-btn" onclick="runRandomPred()">Add Random Noise</button></div>
+                    <div class="r-code">d2 <- d2 %>%
+  <span class="hl-func">mutate</span>(x_random = <span class="hl-func">rnorm</span>(nrow(d2)))
+
+m_noise <- <span class="hl-func">lm</span>(y ~ x1 + x2 + x_random, data = d2)
+
+<span class="hl-func">summary</span>(m_noise)$r.squared       <span class="hl-key"># 略微上升</span>
+<span class="hl-func">summary</span>(m_noise)$adj.r.squared   <span class="hl-key"># 可能下降</span></div>
+                    <div class="r-output" id="out-r2"></div>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <!-- 右侧：交互实验室 -->
+    <aside class="hidden lg:flex w-1/2 bg-[#F5F5F7] h-full items-center justify-center relative p-8">
+        <div class="glass-panel w-full max-w-xl h-[80vh] flex flex-col p-6 relative overflow-hidden">
+            
+            <!-- Lab 标题栏 -->
+            <div class="flex justify-between items-center mb-6 pb-4 border-b border-gray-100">
+                <div class="flex items-center gap-2">
+                    <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                    <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                    <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                </div>
+                <div class="text-xs font-mono text-gray-400 uppercase tracking-widest font-bold" id="viz-title">LABORATORY</div>
+            </div>
+
+            <div class="flex-1 relative w-full h-full">
+                
+                <!-- 1. Simple Regression Viz -->
+                <div id="viz-simple" class="viz-scene active">
+                    <div class="h-64 bg-white rounded-lg shadow-sm p-2 mb-4">
+                        <canvas id="chartSimple"></canvas>
+                    </div>
+                    <div class="text-sm text-slate-500">
+                        <p class="mb-2 font-bold">True Model: $y = 5 - 9x + \epsilon$</p>
+                        <p>红线是真实模型，蓝线是基于样本的拟合。点击左侧 Run 按钮查看具体数值。</p>
+                    </div>
+                </div>
+
+                <!-- 2. Multiple Regression Viz -->
+                <div id="viz-multi" class="viz-scene">
+                    <div class="h-64 bg-white rounded-lg shadow-sm p-2 mb-4 flex items-center justify-center text-slate-400 bg-slate-50">
+                        <p>（此处应为3D图，简化为系数对比）</p>
+                    </div>
+                    <div class="space-y-4">
+                        <div class="flex justify-between border-b pb-2">
+                            <span>True Intercept:</span> <span class="font-mono text-blue-600">-26</span>
+                        </div>
+                        <div class="flex justify-between border-b pb-2">
+                            <span>True x1 Slope:</span> <span class="font-mono text-blue-600">-6</span>
+                        </div>
+                        <div class="flex justify-between border-b pb-2">
+                            <span>True x2 Slope:</span> <span class="font-mono text-blue-600">+7</span>
+                        </div>
+                        <div class="text-xs text-slate-400 mt-2">注意观察 Run 结果与真值的差异。</div>
+                    </div>
+                </div>
+
+                <!-- 3. Exercise Viz -->
+                <div id="viz-exercise" class="viz-scene">
+                    <div class="bg-indigo-50 p-6 rounded-2xl border border-indigo-100 text-center h-full flex flex-col justify-center items-center">
+                        <div class="text-6xl mb-4">📖</div>
+                        <h3 class="text-xl font-bold text-indigo-900 mb-2">Beginning Readers Data</h3>
+                        <p class="text-indigo-700 text-sm max-w-xs">
+                            包含数千条儿童阅读反应时数据。我们通过 `group_by(Word)` 聚合成了单词层面的数据。
+                        </p>
+                    </div>
+                </div>
+
+                <!-- 4. Standardization Viz -->
+                <div id="viz-std" class="viz-scene">
+                    <div class="h-48 bg-white rounded-lg shadow-sm p-2 mb-4 relative">
+                        <canvas id="chartStd"></canvas>
+                    </div>
+                    <div class="text-xs text-gray-500 text-center">
+                        Before vs After Scaling (示意图)
+                    </div>
+                </div>
+
+                <!-- 5. Diagnostics Viz -->
+                <div id="viz-diag" class="viz-scene">
+                    <div class="grid grid-rows-2 gap-4 h-full">
+                        <div class="bg-white rounded-lg shadow-sm p-2 relative">
+                            <h4 class="absolute top-2 left-2 text-xs font-bold text-gray-400">Residuals vs Fitted</h4>
+                            <canvas id="chartResid"></canvas>
+                        </div>
+                        <div class="bg-white rounded-lg shadow-sm p-2 relative">
+                            <h4 class="absolute top-2 left-2 text-xs font-bold text-gray-400">Q-Q Plot</h4>
+                            <canvas id="chartQQ"></canvas>
+                        </div>
+                    </div>
+                    <button class="absolute bottom-0 right-0 bg-gray-200 hover:bg-gray-300 text-xs px-3 py-1 rounded" onclick="refreshDiagnostics()">Refresh Noise</button>
+                </div>
+
+                <!-- 6. Independence -->
+                <div id="viz-indep" class="viz-scene">
+                    <div class="h-full overflow-auto bg-white rounded-xl shadow-inner p-4 font-mono text-xs">
+                        <table class="w-full text-left">
+                            <thead class="border-b">
+                                <tr><th>Subject</th><th>Count</th></tr>
+                            </thead>
+                            <tbody class="divide-y">
+                                <tr><td>S10</td><td>160</td></tr>
+                                <tr><td>S12</td><td>153</td></tr>
+                                <tr><td>S13</td><td>174</td></tr>
+                                <tr><td>S14</td><td>118</td></tr>
+                                <tr><td>S15</td><td>165</td></tr>
+                                <tr><td colspan="2" class="text-center text-gray-400 py-2">... (Many repeated measures) ...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 7. Collinearity Viz -->
+                <div id="viz-collin" class="viz-scene">
+                    <div class="h-56 bg-white rounded-lg shadow-sm p-2 mb-4">
+                        <canvas id="chartCollin"></canvas>
+                    </div>
+                    <div class="bg-red-50 p-4 rounded-xl">
+                        <label class="block text-xs font-bold text-red-800 mb-2">Correlation ($\rho$)</label>
+                        <input type="range" id="slider-rho" min="0" max="0.99" step="0.01" value="0.5" class="w-full accent-red-500" oninput="updateCollin()">
+                        <div class="flex justify-between text-xs text-red-700 mt-1">
+                            <span>0.0</span>
+                            <span id="val-rho" class="font-bold">0.50</span>
+                            <span>0.99</span>
+                        </div>
+                    </div>
+                    <div class="mt-4 text-xs font-mono text-slate-600" id="collin-stats">
+                        Est. Slope x1: ... <br>
+                        Est. Slope x2: ...
+                    </div>
+                </div>
+
+                <!-- 8. Adjusted R2 Viz -->
+                <div id="viz-r2" class="viz-scene">
+                    <div class="flex flex-col h-full justify-center items-center">
+                        <div class="grid grid-cols-2 gap-8 w-full text-center">
+                            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                                <div class="text-gray-400 text-xs uppercase font-bold mb-2">R-Squared</div>
+                                <div class="text-4xl font-bold text-green-600" id="disp-r2">-</div>
+                            </div>
+                            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                                <div class="text-gray-400 text-xs uppercase font-bold mb-2">Adj. R-Squared</div>
+                                <div class="text-4xl font-bold text-blue-600" id="disp-adjr2">-</div>
+                            </div>
+                        </div>
+                        <div class="mt-8 text-center">
+                            <div id="added-vars" class="text-sm text-gray-500 mb-2">Added Random Variables: 0</div>
+                            <p class="text-xs text-gray-400 max-w-xs mx-auto">点击左侧代码块中的 "Add Random Noise" 观察这两个数值的变化趋势。</p>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </aside>
+
+    <!-- JS Logic Engine -->
+    <script>
+        // === OLS Regression Engine (Basic) ===
+        function solveOLS(X, y) {
+            // b = (X'X)^-1 X'y
+            const Xt = math.transpose(X);
+            const XtX = math.multiply(Xt, X);
+            try {
+                const XtX_inv = math.inv(XtX);
+                const XtY = math.multiply(Xt, y);
+                const beta = math.multiply(XtX_inv, XtY);
+                
+                // Calculate R2
+                const n = y.length;
+                const p = X[0].length; // num params including intercept
+                const y_mean = math.mean(y);
+                const y_pred = math.multiply(X, beta);
+                const ss_tot = y.reduce((a, b) => a + Math.pow(b - y_mean, 2), 0);
+                const ss_res = y.reduce((a, b, i) => a + Math.pow(b - y_pred[i], 2), 0);
+                const r2 = 1 - (ss_res / ss_tot);
+                const adj_r2 = 1 - (1 - r2) * ((n - 1) / (n - p));
+
+                return { beta, r2, adj_r2, y_pred, residuals: y.map((yi, i) => yi - y_pred[i]) };
+            } catch (e) {
+                return { beta: Array(X[0].length).fill(NaN), r2: NaN, adj_r2: NaN };
+            }
+        }
+
+        // Helper: Generate Random
+        function runif(n, min, max) { return Array.from({length:n}, () => Math.random() * (max-min) + min); }
+        function rnorm(n, mean=0, sd=1) {
+            // Box-Muller transform
+            return Array.from({length:n}, () => {
+                const u = 1 - Math.random();
+                const v = Math.random();
+                const z = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+                return z * sd + mean;
+            });
+        }
+
+        // === 1. Simple Regression ===
+        const ctxSimple = document.getElementById('chartSimple').getContext('2d');
+        let chartSimple = new Chart(ctxSimple, {
+            type: 'scatter',
+            data: { datasets: [{ label: 'Data', data: [], backgroundColor: '#888' }, { label: 'Fit', data: [], type: 'line', borderColor: 'blue', pointRadius: 0 }] },
+            options: { plugins: { legend: {display: false} }, scales: { x: {type:'linear'} } }
+        });
+
+        function runSimpleReg() {
+            const n = 50;
+            const x = runif(n, -5, 5);
+            const noise = rnorm(n, 0, 1);
+            const y = x.map((xi, i) => 5 + -9 * xi + noise[i]);
+            
+            // Prepare matrix for OLS
+            const X = x.map(xi => [1, xi]);
+            const res = solveOLS(X, y);
+            
+            // Output text
+            const out = `
+Call:
+lm(formula = y ~ x, data = d1)
+
+Coefficients:
+(Intercept)            x  
+     ${res.beta[0].toFixed(4)}      ${res.beta[1].toFixed(4)} 
+
+Multiple R-squared:  ${res.r2.toFixed(4)}
+`;
+            const outEl = document.getElementById('out-simple');
+            outEl.innerText = out;
+            outEl.style.display = 'block';
+
+            // Update Chart
+            chartSimple.data.datasets[0].data = x.map((xi, i) => ({x: xi, y: y[i]}));
+            chartSimple.data.datasets[1].data = [
+                {x: -5, y: res.beta[0] + res.beta[1] * -5},
+                {x: 5, y: res.beta[0] + res.beta[1] * 5}
+            ];
+            chartSimple.update();
+        }
+
+        // === 2. Multiple Regression ===
+        function runMultiReg() {
+            const n = 20;
+            const x1 = runif(n, 13, 27);
+            const x2 = runif(n, -3, 11);
+            const y = x1.map((v, i) => -26 - 6*v + 7*x2[i] + rnorm(1)[0]);
+
+            const X = x1.map((v, i) => [1, v, x2[i]]);
+            const res = solveOLS(X, y);
+
+            const out = `
+Call:
+lm(formula = y ~ x1 + x2, data = d2)
+
+Coefficients:
+(Intercept)           x1           x2  
+    ${res.beta[0].toFixed(4)}      ${res.beta[1].toFixed(4)}       ${res.beta[2].toFixed(4)}
+
+Multiple R-squared:  ${res.r2.toFixed(4)}
+`;
+            const outEl = document.getElementById('out-multi');
+            outEl.innerText = out;
+            outEl.style.display = 'block';
+        }
+
+        // === 3. Exercise ===
+        function runExercise() {
+            // Hardcoded approximate results from PDF for exercise
+            const out = `
+Call:
+lm(formula = RT ~ Freq, data = words)
+Coefficients:
+(Intercept)         Freq  
+   7.54953     -0.05346  
+R2 (Freq only): 0.173
+
+Call:
+lm(formula = RT ~ Freq + OrthLength, data = words)
+Coefficients:
+(Intercept)         Freq   OrthLength  
+   7.40120     -0.04810      0.01502  
+R2 (Both):      0.215 
+
+Conclusion: Adding OrthLength improved R2.
+`;
+            const outEl = document.getElementById('out-exercise');
+            outEl.innerText = out;
+            outEl.style.display = 'block';
+        }
+
+        // === 4. Standardization ===
+        function runStd() {
+            // Simulation
+            const n = 20;
+            const x1 = runif(n, 13, 27);
+            const x2 = runif(n, -3, 11);
+            const y = x1.map((v, i) => -26 - 6*v + 7*x2[i] + rnorm(1)[0]);
+            
+            // Standardize
+            const mean = arr => arr.reduce((a,b)=>a+b)/n;
+            const sd = (arr, m) => Math.sqrt(arr.reduce((a,b)=>a+(b-m)**2,0)/(n-1));
+            
+            const mx1 = mean(x1), sx1 = sd(x1, mx1);
+            const mx2 = mean(x2), sx2 = sd(x2, mx2);
+            
+            const x1_z = x1.map(v => (v-mx1)/sx1);
+            const x2_z = x2.map(v => (v-mx2)/sx2);
+            
+            const X = x1_z.map((v, i) => [1, v, x2_z[i]]);
+            const res = solveOLS(X, y);
+
+            const out = `
+Call:
+lm(formula = y ~ x1_z + x2_z, data = d2)
+
+Coefficients:
+(Intercept)         x1_z         x2_z  
+   ${res.beta[0].toFixed(4)}     ${res.beta[1].toFixed(4)}      ${res.beta[2].toFixed(4)}
+
+Multiple R-squared:  ${res.r2.toFixed(4)}
+`;
+            const outEl = document.getElementById('out-std');
+            outEl.innerText = out;
+            outEl.style.display = 'block';
+        }
+
+        // === 5. Diagnostics ===
+        const ctxResid = document.getElementById('chartResid').getContext('2d');
+        const ctxQQ = document.getElementById('chartQQ').getContext('2d');
+        let chartResid = new Chart(ctxResid, { type: 'scatter', data: {datasets:[{label:'Resid vs Fitted', data:[], backgroundColor: '#0071E3'}]}, options: {plugins:{legend:{display:false}}, scales:{x:{title:{display:true, text:'Fitted'}}, y:{title:{display:true, text:'Residuals'}}}} });
+        let chartQQ = new Chart(ctxQQ, { type: 'scatter', data: {datasets:[{label:'QQ', data:[], backgroundColor: '#0071E3'}, {type:'line', data:[{x:-3,y:-3},{x:3,y:3}], borderColor:'red', pointRadius:0}]}, options: {plugins:{legend:{display:false}}, scales:{x:{title:{display:true, text:'Theoretical'}}, y:{title:{display:true, text:'Sample'}}}} });
+
+        function refreshDiagnostics() {
+            const n = 50;
+            // Generate some heteroscedastic data
+            const x = runif(n, 0, 10);
+            const y = x.map(xi => 2*xi + rnorm(1, 0, 1 + xi*0.5)[0]); // Noise increases with x
+            const X = x.map(xi => [1, xi]);
+            const res = solveOLS(X, y);
+            
+            // Resid Plot
+            chartResid.data.datasets[0].data = res.y_pred.map((yp, i) => ({x: yp, y: res.residuals[i]}));
+            chartResid.update();
+
+            // QQ Plot (Simple sorted approx)
+            const sortedRes = [...res.residuals].sort((a,b)=>a-b);
+            // Normalize
+            const meanRes = sortedRes.reduce((a,b)=>a+b,0)/n;
+            const sdRes = Math.sqrt(sortedRes.reduce((a,b)=>a+(b-meanRes)**2,0)/(n-1));
+            const normRes = sortedRes.map(v => (v-meanRes)/sdRes);
+            
+            const theoretical = normRes.map((_, i) => {
+                const p = (i + 0.5) / n;
+                // Approx inv normal
+                return 4.91 * (Math.pow(p, 0.14) - Math.pow(1-p, 0.14));
+            });
+            
+            chartQQ.data.datasets[0].data = theoretical.map((t, i) => ({x: t, y: normRes[i]}));
+            chartQQ.update();
+        }
+        refreshDiagnostics();
+
+        // === 7. Collinearity ===
+        const ctxCollin = document.getElementById('chartCollin').getContext('2d');
+        let chartCollin = new Chart(ctxCollin, {
+            type: 'scatter',
+            data: {datasets:[{label:'x1 vs x2', data:[], backgroundColor: '#E11D48'}]},
+            options: {scales:{x:{title:{display:true,text:'x1'}}, y:{title:{display:true,text:'x2'}}}}
+        });
+
+        function updateCollin() {
+            const rho = parseFloat(document.getElementById('slider-rho').value);
+            document.getElementById('val-rho').innerText = rho.toFixed(2);
+            
+            const n = 50;
+            const x1 = rnorm(n);
+            // Generate correlated x2
+            const x2 = x1.map(v => rho * v + Math.sqrt(1 - rho*rho) * rnorm(1)[0]);
+            
+            // True y = 2*x1 + 2*x2 + noise
+            const y = x1.map((v, i) => 2*v + 2*x2[i] + rnorm(1)[0]);
+            
+            // Fit
+            const X = x1.map((v, i) => [1, v, x2[i]]);
+            const res = solveOLS(X, y);
+            
+            // Update stats
+            document.getElementById('collin-stats').innerHTML = `
+                Est. Slope x1: <span class="${Math.abs(res.beta[1]-2)>1?'text-red-600 font-bold':''}">${res.beta[1].toFixed(2)}</span> (True: 2.0)<br>
+                Est. Slope x2: <span class="${Math.abs(res.beta[2]-2)>1?'text-red-600 font-bold':''}">${res.beta[2].toFixed(2)}</span> (True: 2.0)
+            `;
+            
+            // Update Chart
+            chartCollin.data.datasets[0].data = x1.map((v, i) => ({x: v, y: x2[i]}));
+            chartCollin.update();
+        }
+        updateCollin();
+
+        // === 8. Adjusted R2 ===
+        let r2_state = {
+            d2_y: [],
+            d2_X_base: [], // [1, x1, x2]
+            added_vars: 0
+        };
+        
+        // Init base data for R2 demo
+        (function initR2() {
+            const n = 30;
+            const x1 = runif(n, 0, 10);
+            const x2 = runif(n, 0, 10);
+            r2_state.d2_y = x1.map((v, i) => 2 + 3*v - 2*x2[i] + rnorm(1)[0]);
+            r2_state.d2_X_base = x1.map((v, i) => [1, v, x2[i]]);
+            
+            const res = solveOLS(r2_state.d2_X_base, r2_state.d2_y);
+            document.getElementById('disp-r2').innerText = res.r2.toFixed(3);
+            document.getElementById('disp-adjr2').innerText = res.adj_r2.toFixed(3);
+        })();
+
+        function runRandomPred() {
+            const n = 30;
+            // Add a new random column to X
+            r2_state.d2_X_base = r2_state.d2_X_base.map(row => [...row, rnorm(1)[0]]);
+            r2_state.added_vars++;
+            
+            const res = solveOLS(r2_state.d2_X_base, r2_state.d2_y);
+            
+            document.getElementById('disp-r2').innerText = res.r2.toFixed(3);
+            document.getElementById('disp-adjr2').innerText = res.adj_r2.toFixed(3);
+            document.getElementById('added-vars').innerText = "Added Random Variables: " + r2_state.added_vars;
+            
+            // Output log
+            const outEl = document.getElementById('out-r2');
+            outEl.innerText += `+ Var ${r2_state.added_vars} -> R2: ${res.r2.toFixed(4)}, Adj.R2: ${res.adj_r2.toFixed(4)}\n`;
+            outEl.style.display = 'block';
+            outEl.scrollTop = outEl.scrollHeight;
+        }
+
+        // === Scrollytelling Logic ===
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    document.querySelectorAll('.prose-section').forEach(el => el.classList.remove('active'));
+                    entry.target.classList.add('active');
+                    
+                    const vizId = entry.target.dataset.viz;
+                    document.querySelectorAll('.viz-scene').forEach(el => {
+                        el.classList.remove('active');
+                        el.style.display = 'none';
+                    });
+                    const target = document.getElementById(vizId);
+                    if(target) {
+                        target.style.display = 'flex'; // or block depends on layout
+                        setTimeout(() => target.classList.add('active'), 10);
+                        // Refresh specific charts if needed
+                        if(vizId === 'viz-diag') refreshDiagnostics();
+                    }
+                    
+                    const titles = {
+                        'viz-simple': 'Simple Linear Regression',
+                        'viz-multi': 'Multiple Regression Coefficients',
+                        'viz-exercise': 'Exercise Context',
+                        'viz-std': 'Standardization',
+                        'viz-diag': 'Model Diagnostics',
+                        'viz-indep': 'Independence Assumption',
+                        'viz-collin': 'Collinearity Simulation',
+                        'viz-r2': 'R-Squared vs Adjusted R-Squared'
+                    };
+                    document.getElementById('viz-title').innerText = titles[vizId] || 'LABORATORY';
+                }
+            });
+        }, { rootMargin: '-40% 0px -40% 0px' });
+
+        document.querySelectorAll('.prose-section').forEach(el => observer.observe(el));
+        
+        // Initial viz state
+        document.querySelectorAll('.viz-scene').forEach(el => el.style.display = 'none');
+        document.getElementById('viz-simple').style.display = 'block';
+        setTimeout(() => document.getElementById('viz-simple').classList.add('active'), 100);
+
+    </script>
+</body>
+</html>
