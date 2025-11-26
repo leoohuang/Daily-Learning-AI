@@ -1,0 +1,553 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ScatterChart, Scatter, ReferenceLine, ResponsiveContainer, BarChart, Bar, Cell, ErrorBar 
+} from 'recharts';
+import { 
+  BookOpen, Code, Activity, Scale, AlertTriangle, CheckCircle, ChevronRight, Calculator, BarChart2, MousePointer, RefreshCw, Layers, Users, Shuffle, GitMerge 
+} from 'lucide-react';
+
+// --- Types & Interfaces ---
+
+interface Section {
+  id: string;
+  title: string;
+  icon: React.ElementType;
+  component: React.ReactNode;
+}
+
+// --- Mock Data Generators ---
+
+// Generate data for 2 groups (Normal dist)
+const generateTwoGroups = (diffMean: boolean = true) => {
+  const groupA = Array.from({ length: 30 }, (_, i) => ({
+    id: i,
+    group: 'A',
+    score: 5 + (Math.random() * 4 - 2), // Mean ~5
+    x_jit: 0 + (Math.random() * 0.4 - 0.2) // Jitter for visualization
+  }));
+  const groupB = Array.from({ length: 30 }, (_, i) => ({
+    id: i + 30,
+    group: 'B',
+    score: (diffMean ? 3 : 5) + (Math.random() * 4 - 2), // Mean ~3 or 5
+    x_jit: 1 + (Math.random() * 0.4 - 0.2)
+  }));
+  return [...groupA, ...groupB];
+};
+
+// Generate data for 3 groups
+const generateThreeGroups = () => {
+  const groupA = Array.from({ length: 20 }, (_, i) => ({ group: 'A', score: 5 + (Math.random() * 3 - 1.5), x_jit: 0 }));
+  const groupB = Array.from({ length: 20 }, (_, i) => ({ group: 'B', score: 2 + (Math.random() * 3 - 1.5), x_jit: 1 }));
+  const groupC = Array.from({ length: 20 }, (_, i) => ({ group: 'C', score: 8 + (Math.random() * 3 - 1.5), x_jit: 2 }));
+  return [...groupA, ...groupB, ...groupC];
+};
+
+// Generate mixed data (Continuous + Categorical)
+const generateMixedData = () => {
+  // Simulate RT = 6.6 - 0.05*Freq - 0.5*(Class==Plant)
+  const data = [];
+  for (let i = 0; i < 50; i++) {
+    const freq = Math.random() * 10;
+    // Animal (Reference)
+    data.push({
+      word: `Animal_${i}`,
+      class: 'Animal',
+      freq: freq,
+      rt: 6.6 - 0.05 * freq + (Math.random() * 0.1 - 0.05)
+    });
+    // Plant (Intercept shift)
+    data.push({
+      word: `Plant_${i}`,
+      class: 'Plant',
+      freq: freq,
+      rt: (6.6 - 0.4) - 0.05 * freq + (Math.random() * 0.1 - 0.05) // Lower intercept
+    });
+  }
+  return data;
+};
+
+// --- Components ---
+
+const CodeBlock = ({ children }: { children: React.ReactNode }) => (
+  <div className="bg-slate-900 text-slate-100 p-4 rounded-lg font-mono text-sm overflow-x-auto my-4 border border-slate-700 shadow-inner">
+    {children}
+  </div>
+);
+
+const InfoBox = ({ title, children, type = 'info' }: { title: string, children: React.ReactNode, type?: 'info' | 'warn' | 'success' }) => {
+  const colors = {
+    info: "bg-blue-50 border-blue-200 text-blue-900",
+    warn: "bg-amber-50 border-amber-200 text-amber-900",
+    success: "bg-emerald-50 border-emerald-200 text-emerald-900"
+  };
+  const Icons = {
+    info: BookOpen,
+    warn: AlertTriangle,
+    success: CheckCircle
+  };
+  const Icon = Icons[type];
+
+  return (
+    <div className={`border-l-4 p-4 rounded-r-md my-4 ${colors[type]}`}>
+      <div className="flex items-center gap-2 font-bold mb-2">
+        <Icon size={18} />
+        <span>{title}</span>
+      </div>
+      <div className="text-sm leading-relaxed">{children}</div>
+    </div>
+  );
+};
+
+// --- Module 1: Two Classes ---
+const ModuleTwoClasses = () => {
+  const [data, setData] = useState(generateTwoGroups());
+  const meanA = data.filter(d => d.group === 'A').reduce((acc, val) => acc + val.score, 0) / 30;
+  const meanB = data.filter(d => d.group === 'B').reduce((acc, val) => acc + val.score, 0) / 30;
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-500">
+      <h2 className="text-2xl font-bold text-gray-800">1. 分类变量基础：两组比较</h2>
+      <p className="text-gray-600">
+        当我们想比较两组数据（如组 A 和组 B）的差异时，线性回归同样适用。R 会自动将分类变量转换为“虚拟变量”(Dummy Variables)。
+      </p>
+
+      <div className="bg-white p-6 border rounded-xl shadow-sm">
+        <h3 className="font-bold text-lg mb-4">数据可视化：点图与均值</h3>
+        <div className="h-64 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+              <CartesianGrid />
+              <XAxis type="number" dataKey="x_jit" name="Group" ticks={[0, 1]} tickFormatter={(val) => val === 0 ? 'Group A' : 'Group B'} domain={[-0.5, 1.5]} />
+              <YAxis type="number" dataKey="score" name="Score" domain={[0, 10]} />
+              <Tooltip cursor={{ strokeDasharray: '3 3' }} />
+              <Scatter name="Scores" data={data} fill="#8884d8" />
+              {/* Mean Lines */}
+              <ReferenceLine y={meanA} stroke="#2563eb" strokeWidth={2} label={{ value: `Mean A: ${meanA.toFixed(2)}`, fill: '#2563eb', position: 'insideTopLeft' }} />
+              <ReferenceLine y={meanB} stroke="#dc2626" strokeWidth={2} label={{ value: `Mean B: ${meanB.toFixed(2)}`, fill: '#dc2626', position: 'insideTopRight' }} />
+            </ScatterChart>
+          </ResponsiveContainer>
+        </div>
+        <button 
+          onClick={() => setData(generateTwoGroups())}
+          className="mt-4 flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded text-sm transition-colors"
+        >
+          <RefreshCw size={16} /> 生成新数据
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <InfoBox title="系数的几何意义" type="info">
+          <p>模型公式：<code>lm(score ~ group, d)</code></p>
+          <ul className="list-disc ml-5 mt-2 space-y-2">
+            <li>
+              <strong>(Intercept)</strong>: 组 A 的均值（因为 A 是默认的 Reference）。
+              <br/><span className="text-blue-600 font-mono font-bold">{meanA.toFixed(2)}</span>
+            </li>
+            <li>
+              <strong>groupB</strong>: 组 B 均值相对于组 A 均值的<strong>差值</strong> (Slope)。
+              <br/><span className="text-red-600 font-mono font-bold">{(meanB - meanA).toFixed(2)}</span>
+            </li>
+          </ul>
+        </InfoBox>
+        <CodeBlock>
+          # 输出结果示例<br/>
+          (Intercept)  groupB<br/>
+          &nbsp;&nbsp;{meanA.toFixed(2)}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{(meanB - meanA).toFixed(2)}
+        </CodeBlock>
+      </div>
+    </div>
+  );
+};
+
+// --- Module 2: Reference Levels ---
+const ModuleReferenceLevels = () => {
+  const [refLevel, setRefLevel] = useState<'A' | 'B'>('A');
+  
+  // Static example data to keep numbers stable for learning
+  const meanA = 4.49;
+  const meanB = 2.98;
+  const diff = meanB - meanA; // -1.51
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-500">
+      <h2 className="text-2xl font-bold text-gray-800">2. 参照水平 (Reference Level) 的陷阱</h2>
+      <p className="text-gray-600">
+        R 默认按字母顺序选择参照组（Group A）。如果我们将参照组改为 B，模型并未改变，但系数的“视角”变了。
+      </p>
+
+      <div className="flex justify-center my-6">
+        <div className="inline-flex bg-gray-100 p-1 rounded-lg">
+          <button 
+            onClick={() => setRefLevel('A')}
+            className={`px-6 py-2 rounded-md text-sm font-bold transition-all ${refLevel === 'A' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'}`}
+          >
+            参照组 = A (默认)
+          </button>
+          <button 
+            onClick={() => setRefLevel('B')}
+            className={`px-6 py-2 rounded-md text-sm font-bold transition-all ${refLevel === 'B' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500'}`}
+          >
+            参照组 = B (fct_relevel)
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+        <div className="bg-slate-800 text-white p-6 rounded-xl font-mono text-sm relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-2 opacity-20"><Activity size={64}/></div>
+          <p className="text-gray-400 mb-2"># Model Summary Coefficients</p>
+          <div className="space-y-4">
+            <div>
+              <span className="text-purple-400">
+                (Intercept) <span className="text-xs text-gray-500">// Mean of {refLevel}</span>
+              </span>
+              <div className="text-2xl font-bold">
+                {refLevel === 'A' ? meanA : meanB}
+              </div>
+            </div>
+            <div>
+              <span className="text-yellow-400">
+                group{refLevel === 'A' ? 'B' : 'A'} <span className="text-xs text-gray-500">// Difference ({refLevel === 'A' ? 'B - A' : 'A - B'})</span>
+              </span>
+              <div className="text-2xl font-bold">
+                {refLevel === 'A' ? diff.toFixed(2) : (-diff).toFixed(2)}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <InfoBox title="发生了什么？" type="warn">
+          <p>
+            注意看斜率（Slope）的<strong>符号</strong>发生了反转！
+          </p>
+          <ul className="list-disc ml-5 mt-2 space-y-1 text-sm">
+            <li>
+              当 <strong>Ref=A</strong>: 斜率是 <span className="font-mono">-1.51</span> (从 4.49 降到 2.98)。
+            </li>
+            <li>
+              当 <strong>Ref=B</strong>: 斜率是 <span className="font-mono">+1.51</span> (从 2.98 升到 4.49)。
+            </li>
+          </ul>
+          <p className="mt-2 text-sm text-gray-500">这也解释了为什么截距从 4.49 变成了 2.98。</p>
+        </InfoBox>
+      </div>
+
+      <CodeBlock>
+        # 改变参照水平的代码<br/>
+        d &lt;- d %&gt;% <br/>
+        &nbsp;&nbsp;mutate(group = fct_relevel(group, 'B'))<br/>
+        <br/>
+        lm(score ~ group, d)
+      </CodeBlock>
+    </div>
+  );
+};
+
+// --- Module 3: Three Groups ---
+const ModuleThreeGroups = () => {
+  // Use static means from PDF to match user expectations if they read carefully, 
+  // or dynamic for interactivity. Let's use dynamic to show "Reference" power.
+  // PDF: A=-4.66, B=1.59, C=8.07
+  const means = { A: -4.66, B: 1.59, C: 8.07 };
+  const [ref, setRef] = useState<'A' | 'B' | 'C'>('A');
+
+  const groups = ['A', 'B', 'C'];
+  const others = groups.filter(g => g !== ref);
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-500">
+      <h2 className="text-2xl font-bold text-gray-800">3. 进阶：三组或更多组</h2>
+      <p className="text-gray-600">
+        当有三个组 (A, B, C) 时，我们需要两个虚拟变量。模型会同时估计：
+        <br/>1. 参照组的均值 (Intercept)
+        <br/>2. 其他各组相对于参照组的<strong>差值</strong>。
+      </p>
+
+      <div className="flex gap-2 mb-4">
+        {groups.map(g => (
+          <button
+            key={g}
+            onClick={() => setRef(g as any)}
+            className={`px-4 py-2 rounded border ${ref === g ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+          >
+            设 {g} 为参照组
+          </button>
+        ))}
+      </div>
+
+      <div className="bg-white p-6 border rounded-xl shadow-sm">
+        <h3 className="font-bold text-gray-700 mb-4 border-b pb-2">模型预测公式 (Mental Model)</h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+          {/* Intercept Box */}
+          <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
+            <div className="text-xs text-blue-600 font-bold uppercase mb-1">Intercept (Ref {ref})</div>
+            <div className="text-3xl font-mono text-blue-800">{means[ref]}</div>
+            <div className="text-xs text-gray-400 mt-2">Mean of Group {ref}</div>
+          </div>
+
+          {/* Coefficient 1 */}
+          <div className="p-4 bg-green-50 rounded-lg border border-green-100">
+            <div className="text-xs text-green-600 font-bold uppercase mb-1">Slope: group{others[0]}</div>
+            <div className="text-3xl font-mono text-green-800">
+              {(means[others[0] as keyof typeof means] - means[ref]).toFixed(2)}
+            </div>
+            <div className="text-xs text-gray-400 mt-2">Mean {others[0]} - Mean {ref}</div>
+          </div>
+
+          {/* Coefficient 2 */}
+          <div className="p-4 bg-green-50 rounded-lg border border-green-100">
+            <div className="text-xs text-green-600 font-bold uppercase mb-1">Slope: group{others[1]}</div>
+            <div className="text-3xl font-mono text-green-800">
+              {(means[others[1] as keyof typeof means] - means[ref]).toFixed(2)}
+            </div>
+            <div className="text-xs text-gray-400 mt-2">Mean {others[1]} - Mean {ref}</div>
+          </div>
+        </div>
+
+        <div className="mt-6 h-48 w-full">
+           <ResponsiveContainer width="100%" height="100%">
+             <BarChart data={groups.map(g => ({ name: g, val: means[g as keyof typeof means] }))}>
+               <CartesianGrid strokeDasharray="3 3" vertical={false} />
+               <XAxis dataKey="name" />
+               <YAxis domain={[-10, 10]} />
+               <Tooltip />
+               <ReferenceLine y={0} stroke="#000" />
+               <Bar dataKey="val">
+                 {groups.map((g, index) => (
+                   <Cell key={`cell-${index}`} fill={g === ref ? '#2563eb' : '#82ca9d'} />
+                 ))}
+               </Bar>
+             </BarChart>
+           </ResponsiveContainer>
+           <p className="text-xs text-center text-gray-500 mt-2">蓝色为当前参照组 (Intercept)，绿色为其他组。</p>
+        </div>
+      </div>
+
+      <InfoBox title="为什么看不到 B 和 C 的比较？" type="warn">
+        <p>
+          在默认模型（Ref=A）中，我们只能看到 B-A 和 C-A 的差异。
+          <br/>如果要比较 B 和 C，你需要将参照组重新设定为 B，或者进行事后检验（Post-hoc tests，本篇未涵盖）。
+        </p>
+      </InfoBox>
+    </div>
+  );
+};
+
+// --- Module 4: Residuals ---
+const ModuleResiduals = () => {
+  const [activeTab, setActiveTab] = useState<'hist' | 'scatter'>('hist');
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-500">
+      <h2 className="text-2xl font-bold text-gray-800">4. 残差诊断 (Residuals)</h2>
+      <p className="text-gray-600">
+        即使是分类变量，回归假设（正态性、同方差性）依然适用。
+      </p>
+
+      <div className="bg-white border rounded-xl overflow-hidden shadow-sm">
+        <div className="flex border-b bg-gray-50">
+          <button 
+            onClick={() => setActiveTab('hist')}
+            className={`px-6 py-3 text-sm font-medium ${activeTab === 'hist' ? 'bg-white text-blue-600 border-t-2 border-blue-600' : 'text-gray-500 hover:text-gray-800'}`}
+          >
+            1. 正态性检验 (Histogram)
+          </button>
+          <button 
+            onClick={() => setActiveTab('scatter')}
+            className={`px-6 py-3 text-sm font-medium ${activeTab === 'scatter' ? 'bg-white text-blue-600 border-t-2 border-blue-600' : 'text-gray-500 hover:text-gray-800'}`}
+          >
+            2. 同方差性检验 (Fitted vs Res)
+          </button>
+        </div>
+
+        <div className="p-6 h-64 flex flex-col items-center justify-center">
+          {activeTab === 'hist' ? (
+             <div className="w-full h-full flex items-center justify-center text-gray-400 border-2 border-dashed rounded-lg">
+               {/* Simplified representation for educational purpose */}
+               <div className="text-center">
+                 <Activity size={48} className="mx-auto mb-2 opacity-50"/>
+                 <p>此处应显示钟形曲线</p>
+                 <code className="text-xs bg-gray-100 px-2 py-1 rounded">hist(residuals(m))</code>
+               </div>
+             </div>
+          ) : (
+             <div className="w-full h-full relative">
+               <ResponsiveContainer width="100%" height="100%">
+                 <ScatterChart>
+                   <CartesianGrid />
+                   <XAxis type="category" dataKey="group" name="Fitted Values" allowDuplicatedCategory={false} />
+                   <YAxis dataKey="res" name="Residuals" domain={[-5, 5]} />
+                   <Tooltip cursor={{ strokeDasharray: '3 3' }} />
+                   <ReferenceLine y={0} stroke="#000" />
+                   {/* Simulated residual plot for categorical data: vertical stripes */}
+                   <Scatter name="Res" data={[
+                     ...Array.from({length: 20}, () => ({ group: 'Mean A', res: Math.random()*4-2 })),
+                     ...Array.from({length: 20}, () => ({ group: 'Mean B', res: Math.random()*4-2 })),
+                     ...Array.from({length: 20}, () => ({ group: 'Mean C', res: Math.random()*4-2 })),
+                   ]} fill="#8884d8" />
+                 </ScatterChart>
+               </ResponsiveContainer>
+               <div className="absolute top-2 right-2 bg-white/80 p-2 text-xs rounded border shadow-sm">
+                 注意：分类数据的残差图呈现<strong>垂直条带状</strong>是正常的。<br/>
+                 重要的是每组的垂直散布范围（方差）是否大致相等。
+               </div>
+             </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- Module 5: Mixed Predictors ---
+const ModuleMixed = () => {
+  const [data] = useState(generateMixedData());
+  
+  // Coefficients based on PDF: Intercept=6.64, Freq=-0.049, ClassPlant=-0.048
+  // This means Plant line is parallel but lower than Animal line
+  
+  return (
+    <div className="space-y-6 animate-in fade-in duration-500">
+      <h2 className="text-2xl font-bold text-gray-800">5. 混合模型：分类 + 连续变量</h2>
+      <p className="text-gray-600">
+        当我们同时有连续变量（如词频 Frequency）和分类变量（如词性 Class）时，模型相当于画了<strong>两条平行的回归线</strong>。
+      </p>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white p-4 border rounded-xl shadow-sm h-80">
+          <ResponsiveContainer width="100%" height="100%">
+            <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+              <CartesianGrid />
+              <XAxis type="number" dataKey="freq" name="Frequency" unit=" Hz" />
+              <YAxis type="number" dataKey="rt" name="RT" domain={[5.5, 7]} />
+              <Tooltip cursor={{ strokeDasharray: '3 3' }} />
+              <Legend />
+              
+              <Scatter name="Animal" data={data.filter(d => d.class === 'Animal')} fill="#3b82f6" shape="circle" />
+              <Scatter name="Plant" data={data.filter(d => d.class === 'Plant')} fill="#22c55e" shape="triangle" />
+              
+              {/* Regression Lines */}
+              {/* Line for Animal (Ref): y = 6.64 - 0.05x */}
+              <Line dataKey="lineAnimal" data={[{freq: 0, rt: 6.64}, {freq: 10, rt: 6.64 - 0.5}]} stroke="#3b82f6" strokeWidth={2} dot={false} activeDot={false} name="Fit: Animal" isAnimationActive={false} />
+              
+              {/* Line for Plant: y = (6.64 - 0.048) - 0.05x */}
+              <Line dataKey="linePlant" data={[{freq: 0, rt: 6.59}, {freq: 10, rt: 6.59 - 0.5}]} stroke="#22c55e" strokeWidth={2} strokeDasharray="5 5" dot={false} activeDot={false} name="Fit: Plant" isAnimationActive={false} />
+            </ScatterChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="space-y-4">
+          <InfoBox title="系数解读" type="success">
+            <ul className="space-y-3 text-sm">
+              <li>
+                <div className="font-bold text-blue-700">(Intercept) = 6.64</div>
+                <div className="text-gray-500">Animal 类别的截距（当 Freq=0 时）。</div>
+              </li>
+              <li>
+                <div className="font-bold text-gray-700">Frequency = -0.05</div>
+                <div className="text-gray-500">
+                  斜率。注意：无论 Animal 还是 Plant，斜率都是一样的（这就是“平行”假设）。
+                </div>
+              </li>
+              <li>
+                <div className="font-bold text-green-700">ClassPlant = -0.05</div>
+                <div className="text-gray-500">
+                  两条线之间的<strong>垂直距离</strong>。说明在相同频率下，植物词的反应时间比动物词快 0.05ms。
+                </div>
+              </li>
+            </ul>
+          </InfoBox>
+          <div className="bg-yellow-50 p-3 rounded text-xs text-yellow-800 border border-yellow-200">
+            <strong>思考：</strong> 如果两条线不是平行的（斜率不同），那意味着什么？<br/>
+            答案：意味着存在<strong>交互作用 (Interaction)</strong>，这是更高阶的话题。
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- Main App Component ---
+
+const CategoricalRegressionLab = () => {
+  const [activeSection, setActiveSection] = useState('two_classes');
+
+  const sections: Section[] = [
+    { id: 'two_classes', title: '1. 两组比较 (Two Groups)', icon: Users, component: <ModuleTwoClasses /> },
+    { id: 'ref_levels', title: '2. 参照水平 (Reference)', icon: Shuffle, component: <ModuleReferenceLevels /> },
+    { id: 'three_groups', title: '3. 多组比较 (3+ Groups)', icon: Layers, component: <ModuleThreeGroups /> },
+    { id: 'residuals', title: '4. 残差诊断 (Residuals)', icon: Activity, component: <ModuleResiduals /> },
+    { id: 'mixed', title: '5. 混合模型 (Mixed)', icon: GitMerge, component: <ModuleMixed /> },
+  ];
+
+  const ActiveComponent = sections.find(s => s.id === activeSection)?.component;
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row text-gray-800 font-sans">
+      {/* Sidebar Navigation */}
+      <aside className="w-full md:w-64 bg-white border-r border-gray-200 flex-shrink-0 md:h-screen sticky top-0 overflow-y-auto z-10">
+        <div className="p-6 border-b border-gray-100">
+          <h1 className="text-xl font-extrabold text-blue-700 flex items-center gap-2">
+            <Scale />
+            Categorical Lab
+          </h1>
+          <p className="text-xs text-gray-400 mt-1">Based on 07-categorical-predictors-lab</p>
+        </div>
+        <nav className="p-4 space-y-1">
+          {sections.map((section) => {
+            const Icon = section.icon;
+            const isActive = activeSection === section.id;
+            return (
+              <button
+                key={section.id}
+                onClick={() => setActiveSection(section.id)}
+                className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-all duration-200 ${
+                  isActive 
+                    ? 'bg-blue-50 text-blue-700 shadow-sm' 
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                }`}
+              >
+                <Icon size={18} className={isActive ? 'text-blue-600' : 'text-gray-400'} />
+                <span className="flex-1 text-left">{section.title}</span>
+                {isActive && <ChevronRight size={16} />}
+              </button>
+            );
+          })}
+        </nav>
+      </aside>
+
+      {/* Main Content Area */}
+      <main className="flex-1 p-4 md:p-8 lg:p-12 overflow-y-auto">
+        <div className="max-w-4xl mx-auto">
+          {ActiveComponent}
+          
+          <div className="mt-12 flex justify-between border-t pt-6">
+            <button 
+              disabled={activeSection === sections[0].id}
+              onClick={() => {
+                const idx = sections.findIndex(s => s.id === activeSection);
+                if (idx > 0) setActiveSection(sections[idx - 1].id);
+              }}
+              className="px-4 py-2 text-sm text-gray-500 hover:text-blue-600 disabled:opacity-30 disabled:hover:text-gray-500 transition-colors"
+            >
+              ← 上一节
+            </button>
+            <button 
+              disabled={activeSection === sections[sections.length - 1].id}
+              onClick={() => {
+                const idx = sections.findIndex(s => s.id === activeSection);
+                if (idx < sections.length - 1) setActiveSection(sections[idx + 1].id);
+              }}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium shadow hover:bg-blue-700 disabled:opacity-50 transition-all transform active:scale-95"
+            >
+              下一节 →
+            </button>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+};
+
+export default CategoricalRegressionLab;
