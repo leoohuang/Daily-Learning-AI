@@ -1,0 +1,258 @@
+---
+title: "Categorical predictors"
+author: "Marcin Włodarczak"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+editor_options:
+  chunk_output_type: console
+output: pdf_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, tidy = FALSE, size = 'footnotesize', fig.align = 'center', out.width = '0.7\\textwidth', cache = FALSE)
+```
+
+```{r message=FALSE}
+library('tidyverse')
+theme_set(theme_bw())
+```
+
+# Categorical vs. numerical  predictors
+
+So far we have dealt with numerical predictors but often we are interested in differences between *groups* of some kind. How to deal with those? Fortunately, the linear modelling strategy we have learnt can easily cover these cases.
+
+# Two classes
+
+Let's generate data for two groups (`A` and `B`), each with 30 data points, sampled from normal distributions with the means of 5 and 3 and the same standard deviation of 4:
+```{r}
+d <- tibble(score = c(rnorm(30, 5, 4), rnorm(30, 3, 4)),
+            group = rep(c('A', 'B'), each = 30))
+head(d)
+tail(d)
+```
+
+Since we `group` only takes one of two values (`A` or `B`), it makes sense to convert it to a *factor*:
+```{r}
+d <- d %>%
+  mutate(group = as_factor(group))
+d$group
+```
+
+We can plot this data as boxplots:
+```{r}
+ggplot(d, aes(x = group, y = score)) +
+  geom_boxplot()
+```
+
+The question now is how we can *model* this data. As it happens, we can simply plug the categorical variable into the regression formula:
+```{r}
+m1 <- lm(score ~ group, d)
+summary(m1)
+```
+
+That's great but what do these coefficients mean? What R does under the hood is map one of the groups (by default the first one when group names are sorted alphabetically) to 0 (the intercept) and the other group to 1. Indeed we can see that:
+
+- the intercept estimate (`r round(coef(m1)[1], 4)`) is equal to the mean of group `A`
+- the slope (`r round(coef(m1)[2], 4)`) corresponds to the difference between the second group mean and the intercept
+
+```{r}
+d %>%
+  group_by(group) %>%
+  summarise(mean_score = mean(score))
+```
+
+Note that we can *re-level* the group factor and make `B` the reference using `fct_relevel`:
+```{r}
+d <- d %>%
+  mutate(group = fct_relevel(group, 'B'))
+levels(d$group)
+```
+
+If we refit the model now, the intercept will be equal to the mean of group `B` and the slope will the same but with the opposite sign:
+```{r}
+m2 <- lm(score ~ group, d)
+coefficients(m2)
+```
+
+## Exercise
+
+The data set `ratings` from the `langaugeR` package includes, among other things, average ratings of referent size for a bunch of English words, marked for whether the referent is an animal or a plant:
+```{r}
+library('languageR')
+data('ratings')
+```
+
+Let's extract the `Word`, `Class` and `meanSizeRating` columns:
+```{r}
+ratings <- ratings %>%
+  select('Word', 'Class', 'meanSizeRating')
+head(ratings)
+```
+
+1. Visualize the distribution of average size ratings for the animal and plant word categories and calculate their mean values.
+```{r}
+# Write your solution here.
+```
+
+2. Fit a regression model predicting mean size rating from the category of the referent and interpret the model coefficients.
+```{r}
+# Write your solution here.
+```
+
+3. Refit the model with "Plant" as the reference.
+```{r}
+# Write your solution here.
+```
+
+# Three or more classes
+
+The above can be easily generalized to situations when we have more than two classes:
+```{r}
+d3 <- tibble(score = c(rnorm(30, -5, 2), rnorm(30, 2, 2), rnorm(30, 8, 2)),
+             group = rep(c('A', 'B', 'C'), each = 30))
+```
+
+Again, we will convert `group` to a factor:
+```{r}
+d3 <- d3 %>%
+  mutate(group = as_factor(group))
+```
+
+Note that since `A` comes first in the alphabet, it will be used as the reference:
+```{r}
+levels(d3$group)
+```
+
+Here is the distribution of `score` in each group:
+```{r}
+ggplot(d3, aes(group, score)) +
+  geom_boxplot()
+```
+
+Let's fit the model:
+```{r}
+m3 <- lm(score ~ group, d3)
+summary(m3)
+```
+
+As before, the intercept is equal to the mean of the reference group (in our case, `A`). The other two coefficients are equal to the difference between the respective group means and the intercept:
+```{r}
+d3 %>%
+  group_by(group) %>%
+  summarise(mean_score = mean(score))
+```
+
+Note that we do not get the comparison between `B` and `C`. To do that we need to use one of them as a reference:
+```{r}
+d3 <- d3 %>%
+  mutate(group = fct_relevel(group, 'B'))
+m4 <- lm(score ~ group, d3)
+summary(m4)
+```
+
+Now we have the `B`-`C` and `B`-`A` comparisons but not the `A`-`C` comparison.
+
+## Exercise
+
+Re-level the `group` factor to use `C` as a reference, refit the model and interpret the coefficients.
+```{r}
+# Write your solution here.
+```
+
+## Exercise
+
+The file `lynott09.csv` contains a subset of data from Lynott, D. and Connell, L. (2009). *Behavior Research Methods* 41: 558. https://doi.org/10.3758/BRM.41.2.558, which measured the strength of association between adjectives and different modalities (auditory, haptic, olfactory etc.). **Remember to set the working directory to the location of the `Rmd` file before you attempt to read in the data.**
+```{r message=FALSE}
+lynott09 <- read_csv('lynott09.csv')
+```
+
+Create a model which predicts the degree to which adjectives with different dominant modalities (column `DominantModality`) are tied to a *single* perceptual modality (column `ModalityExclusivity`). Interpret the model coefficients.
+```{r}
+# Write your solution here.
+```
+
+# Revisiting the residuals
+
+Remember analysis of residuals from last time. It is pretty much the same thing here.  First of all, we would like residuals to be distributed normally.
+```{r}
+res <- residuals(m4)
+hist(res)
+qqnorm(res)
+qqline(res)
+```
+
+Second, we want to see them have the same variance for each group:
+```{r}
+fitted_vals <- fitted(m4)
+plot(fitted_vals, res)
+```
+
+That looks alright but are the fitted values? Remember that the expected value for each group is simply its mean:
+```{r}
+d3 %>%
+  group_by(group) %>%
+  summarise(mean_score = mean(score))
+```
+
+Remember how we said at the very beginning that you can think of the mean as a very simple model? Here you can see that this is really the case!
+
+## Exercise
+
+Analyse the distribution of residuals in the `lynott09` model. 
+```{r}
+# Write your solution here.
+```
+
+# Combining categorical and continuous predictors
+
+Obviously, we can combine numerical and categorical predictors in a single model. Below we revisit the `lexdec` lexical decision data (from the `languageR` package, see `?lexdec` for more information) again:
+```{r}
+data(lexdec)
+```
+
+Let's create a data summary with some statistics for each word:
+
+- `Class`: category of the referent (`animal` or `plant`)
+- `Frequency`: word frequency (log-transformed)
+- `Length`: word length in characters
+- `RT`: mean reaction time (in $\log(ms)$)
+
+```{r}
+words <- lexdec %>%
+  group_by(Word) %>%
+  summarise(Class = first(Class),
+            Frequency = first(Frequency),
+            Length = first(Length),
+            RT = mean(RT))
+```
+
+
+Let's fit a regression model which predicts reaction time (`RT`) from word frequency (`Freq`) and word class (`Class`)
+```{r}
+lexdec_m <- lm(RT ~ Frequency + Class, words)
+summary(lexdec_m)
+```
+
+Here is how we would interpret this model (remember that reaction time is expressed on a logarithmic scale!):
+
+- Intercept: the expected reaction time when both predictors are equal to 0, that is for a word denoting an animal with a frequency of 0. We can tell that the `animal` class was mapped on the intercept because `Classplant` is present in the model summary and therefore is not used as a reference. In addition, "animal" precedes "plant" when sorted in alphabetical order.
+- Frequency: the change in reaction time corresponding to an increase of one in word frequency (note that frequency is also expressed on a logarithmic scale).
+- Class: The difference in reaction time between the `plant` and `animal` categories.
+
+## Exercise 
+
+Using the data above, standardize `Frequency` and refit the model. How do you interpret the coefficients now?
+
+```{r}
+# Write your solution here.
+```
+
+## Exercise
+
+Re-fit the model above with word length (`Length`) as an additional predictor. Interpret the coefficients.
+
+```{r}
+# Write your solution here.
+```
+
+

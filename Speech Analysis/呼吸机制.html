@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>呼吸机制 SVG 动画对比</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f0f4f8;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        h1 {
+            color: #334155;
+            margin-bottom: 30px;
+            font-size: 24px;
+        }
+
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+            max-width: 900px;
+            width: 100%;
+            text-align: center;
+        }
+
+        /* --- 核心动画定义 --- */
+
+        /* 正常呼吸 (2s 吸, 3s 呼) Total 5s */
+        @keyframes normal-lung-scale {
+            0% { transform: scale(0.85); }   /* 开始吸气 */
+            40% { transform: scale(1.05); }  /* 吸气结束 (2s) */
+            100% { transform: scale(0.85); } /* 呼气结束 (5s) */
+        }
+        
+        @keyframes normal-rib-rotate {
+            0% { transform: rotate(15deg); }
+            40% { transform: rotate(0deg); }
+            100% { transform: rotate(15deg); }
+        }
+
+        @keyframes normal-diaphragm {
+            0% { transform: translateY(0px); }      /* 放松位置 */
+            40% { transform: translateY(25px); }    /* 收缩下降 */
+            100% { transform: translateY(0px); }    /* 回弹 */
+        }
+
+        @keyframes normal-label-opacity {
+            0%, 35% { opacity: 0; }
+            40%, 95% { opacity: 1; } /* 呼气时显示“弹性回缩” */
+            100% { opacity: 0; }
+        }
+
+        /* 说话呼吸 (1s 吸, 8s 呼) Total 9s */
+        @keyframes speech-lung-scale {
+            0% { transform: scale(0.8); }    
+            11% { transform: scale(1.1); }   /* 快速吸气 (约1s) */
+            100% { transform: scale(0.8); }  /* 缓慢呼气 */
+        }
+
+        @keyframes speech-rib-rotate {
+            0% { transform: rotate(18deg); }
+            11% { transform: rotate(-2deg); }
+            100% { transform: rotate(18deg); }
+        }
+
+        @keyframes speech-diaphragm {
+            0% { transform: translateY(0px); }
+            11% { transform: translateY(30px); }
+            100% { transform: translateY(0px); }
+        }
+
+        @keyframes speech-muscle-active {
+            0%, 11% { fill: #e2e8f0; stroke: #cbd5e1; } /* 吸气时普通颜色 */
+            12%, 100% { fill: #fca5a5; stroke: #ef4444; } /* 呼气时变红 (主动收缩) */
+        }
+        
+        @keyframes speech-arrow-show {
+            0%, 11% { opacity: 0; }
+            12%, 95% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+
+        /* --- SVG 元素类绑定 --- */
+        
+        /* 左侧：正常呼吸 */
+        .normal-group .lung { animation: normal-lung-scale 5s ease-in-out infinite; transform-origin: center bottom; }
+        .normal-group .rib-cage { animation: normal-rib-rotate 5s ease-in-out infinite; transform-origin: 150px 100px; }
+        .normal-group .diaphragm-path { animation: normal-diaphragm 5s ease-in-out infinite; }
+        .normal-group .indicator-text { animation: normal-label-opacity 5s ease infinite; }
+
+        /* 右侧：说话呼吸 */
+        .speech-group .lung { animation: speech-lung-scale 9s linear infinite; transform-origin: center bottom; }
+        .speech-group .rib-cage { animation: speech-rib-rotate 9s linear infinite; transform-origin: 450px 100px; }
+        .speech-group .diaphragm-path { animation: speech-diaphragm 9s linear infinite; }
+        .speech-group .intercostal-muscle { animation: speech-muscle-active 9s linear infinite; }
+        .speech-group .force-arrow { animation: speech-arrow-show 9s linear infinite; }
+
+        /* 通用样式 */
+        .svg-text { font-size: 14px; font-weight: bold; fill: #475569; }
+        .sub-text { font-size: 12px; fill: #64748b; }
+        
+    </style>
+</head>
+<body>
+
+    <h1>呼吸动力学：SVG 动画演示</h1>
+
+    <div class="container">
+        <svg viewBox="0 0 600 400" width="100%" height="100%" preserveAspectRatio="xMidYMid meet">
+            <defs>
+                <linearGradient id="lungGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style="stop-color:#fca5a5;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#ef4444;stop-opacity:1" />
+                </linearGradient>
+                <marker id="arrowRed" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+                    <path d="M0,0 L0,6 L9,3 z" fill="#dc2626" />
+                </marker>
+                <marker id="arrowGreen" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+                    <path d="M0,0 L0,6 L9,3 z" fill="#059669" />
+                </marker>
+            </defs>
+
+            <!-- ================= 左侧：正常呼吸 ================= -->
+            <g class="normal-group" transform="translate(0,0)">
+                <text x="150" y="30" text-anchor="middle" class="svg-text" style="font-size: 18px;">正常呼吸 (安静状态)</text>
+                <text x="150" y="55" text-anchor="middle" class="sub-text">呼气是被动的 (弹性回缩)</text>
+
+                <!-- 脊柱背景 -->
+                <path d="M150 80 L150 320" stroke="#e2e8f0" stroke-width="10" stroke-linecap="round"/>
+
+                <!-- 肺部容器 -->
+                <g transform="translate(150, 240)">
+                    <g class="lung">
+                         <path d="M-10 -120 C -60 -120, -70 -50, -70 0 C -70 50, -40 70, -10 70 Z" fill="url(#lungGrad)" opacity="0.7"/>
+                         <path d="M10 -120 C 60 -120, 70 -50, 70 0 C 70 50, 40 70, 10 70 Z" fill="url(#lungGrad)" opacity="0.7"/>
+                    </g>
+                </g>
+
+                <!-- 膈肌 -->
+                <path class="diaphragm-path" d="M80 280 Q 150 230, 220 280" fill="none" stroke="#64748b" stroke-width="8" stroke-linecap="round"/>
+
+                <!-- 肋骨组 -->
+                <g class="rib-cage">
+                     <!-- 简化的肋骨示意 -->
+                     <path d="M140 120 Q 70 110, 70 160" fill="none" stroke="#94a3b8" stroke-width="6" stroke-linecap="round"/>
+                     <path d="M160 120 Q 230 110, 230 160" fill="none" stroke="#94a3b8" stroke-width="6" stroke-linecap="round"/>
+                     
+                     <path d="M140 160 Q 65 150, 65 200" fill="none" stroke="#94a3b8" stroke-width="6" stroke-linecap="round"/>
+                     <path d="M160 160 Q 235 150, 235 200" fill="none" stroke="#94a3b8" stroke-width="6" stroke-linecap="round"/>
+                </g>
+
+                <!-- 弹性回缩指示箭头 (仅呼气显示) -->
+                <g class="indicator-text">
+                    <text x="150" y="350" text-anchor="middle" fill="#059669" font-weight="bold" font-size="14">弹性回缩 (Relax)</text>
+                    <path d="M80 200 L 110 220" stroke="#059669" stroke-width="3" marker-end="url(#arrowGreen)"/>
+                    <path d="M220 200 L 190 220" stroke="#059669" stroke-width="3" marker-end="url(#arrowGreen)"/>
+                </g>
+            </g>
+
+            <!-- ================= 分隔线 ================= -->
+            <line x1="300" y1="50" x2="300" y2="350" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="5,5"/>
+
+            <!-- ================= 右侧：说话呼吸 ================= -->
+            <g class="speech-group" transform="translate(300,0)">
+                <text x="150" y="30" text-anchor="middle" class="svg-text" style="font-size: 18px;">说话/歌唱呼吸</text>
+                <text x="150" y="55" text-anchor="middle" class="sub-text">呼气是主动的 (肌肉控制)</text>
+
+                <!-- 脊柱背景 -->
+                <path d="M150 80 L150 320" stroke="#e2e8f0" stroke-width="10" stroke-linecap="round"/>
+
+                <!-- 肺部容器 -->
+                <g transform="translate(150, 240)">
+                    <g class="lung">
+                         <path d="M-10 -120 C -60 -120, -70 -50, -70 0 C -70 50, -40 70, -10 70 Z" fill="url(#lungGrad)" opacity="0.7"/>
+                         <path d="M10 -120 C 60 -120, 70 -50, 70 0 C 70 50, 40 70, 10 70 Z" fill="url(#lungGrad)" opacity="0.7"/>
+                    </g>
+                </g>
+
+                <!-- 膈肌 -->
+                <path class="diaphragm-path" d="M80 280 Q 150 230, 220 280" fill="none" stroke="#64748b" stroke-width="8" stroke-linecap="round"/>
+
+                <!-- 肋骨与肌肉组 -->
+                <g class="rib-cage">
+                     <!-- 肋间内肌 (填充在肋骨之间) -->
+                     <path class="intercostal-muscle" d="M70 160 Q 68 180, 140 180 L 140 140 Q 68 140, 70 160 Z" fill="#e2e8f0" stroke="none" />
+                     <path class="intercostal-muscle" d="M230 160 Q 232 180, 160 180 L 160 140 Q 232 140, 230 160 Z" fill="#e2e8f0" stroke="none" />
+
+                     <!-- 肋骨 -->
+                     <path d="M140 120 Q 70 110, 70 160" fill="none" stroke="#94a3b8" stroke-width="6" stroke-linecap="round"/>
+                     <path d="M160 120 Q 230 110, 230 160" fill="none" stroke="#94a3b8" stroke-width="6" stroke-linecap="round"/>
+                     
+                     <path d="M140 160 Q 65 150, 65 200" fill="none" stroke="#94a3b8" stroke-width="6" stroke-linecap="round"/>
+                     <path d="M160 160 Q 235 150, 235 200" fill="none" stroke="#94a3b8" stroke-width="6" stroke-linecap="round"/>
+                </g>
+
+                <!-- 主动发力指示箭头 -->
+                <g class="force-arrow">
+                    <text x="150" y="350" text-anchor="middle" fill="#dc2626" font-weight="bold" font-size="14">主动控制 (Active)</text>
+                    <text x="150" y="370" text-anchor="middle" fill="#dc2626" font-size="12">肋间内肌收缩</text>
+                    <!-- 挤压箭头 -->
+                    <path d="M60 200 L 90 200" stroke="#dc2626" stroke-width="4" marker-end="url(#arrowRed)"/>
+                    <path d="M240 200 L 210 200" stroke="#dc2626" stroke-width="4" marker-end="url(#arrowRed)"/>
+                </g>
+            </g>
+
+        </svg>
+    </div>
+
+</body>
+</html>

@@ -1,0 +1,388 @@
+---
+title: "Lab 13: Model selection and regularization"
+author: "Rita Almeida"
+date: "Autumn 2025"
+output: pdf_document
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, tidy = FALSE, size = 'footnotesize', 
+                      fig.align = 'center', cache = FALSE)
+```
+
+For this lab we use the packages *glmnet* and *leaps*.
+If you do not have these packages installed, do it using the commands install.packages("glmnet") and install.packages("leaps").
+
+
+```{r message= FALSE}
+library('tidyverse')
+library("boot")
+library("MASS")
+library("glmnet")
+library ("leaps")
+theme_set(theme_bw())
+```
+
+This lab uses the data in *Mireault2.csv*, which is a modified subset of a freely available data set, which is described in the book *Statistical Methods for Psychology*, from D. C. Howell. 
+
+The data set consists of several variables measured on a group of 375 students. The data was collected to investigate the impact of parental loss and levels of symptoms on self-perceived vulnerability to loss. The variables used in this lab are briefly described below. The variable **PvTotal** will be used as outcome. 
+ 
+Gender - 1 for male, 2 for female  
+College - 1 if the student is in college, 0 otherwise \
+SomT - Somatization T score  
+ObsessT - Obsessive-compulsive T score  
+SensitT - Interperssonal sensitivity T score  
+DepressT - Depression T score  
+AnxT - Anxiety T score  
+HostT - Hostility T score  
+PhobT - Phobic anxiety T score  
+ParT - Paranoid ideation T score  
+PsyT - Psychoticism T score  
+PVTotal - Perceived vulnerability total score  
+SuppTotal - Social support score  
+Loss - 1 if the student lost at least one of the parents, 0 otherwise
+
+We start by reading the data set and visualizing the 5 first observations. 
+
+```{r}
+Mir <- read_csv('Mireault2.csv')
+head(Mir, 5)
+```
+
+# Subset selection methods
+
+## Best subset selection
+
+The function *regsubsets()* from the library *leaps* determines what is the best model for each given number of predictors. The option *nvmax=13* tells that we want the best model among models with 1 predictor until models with 13 predictors. 
+The syntax is the same as for the function *lm()*. In the code below we fit a multiple linear regression with *PVTotal* as outcome and all other variables as predictors, apart from a constant. 
+
+```{r}
+regfit.full = regsubsets( PVTotal~. , data=Mir, nvmax =13)
+```
+
+The command *summary()* displays which are the variables selected for the best model with 1 variable, 2 variables, and so on until 13 variables. 
+```{r}
+reg.summary=summary(regfit.full)
+reg.summary
+```
+
+The command *summary()* also returns several measures of quality of the fit, adjusted for model size. In particular it can return *Cp*, *adjusted $R^2$* and *BIC*. Comparing these values across models one can determine the best model.
+
+Below we show the values of *adjusted $R^2$*:
+
+```{r}
+reg.summary$adjr2
+```
+
+and of *BIC*:
+
+```{r}
+reg.summary$bic
+```
+
+The commands *which.max* and *which.min* give the index of the maximum / minimum value in a vector. These commands can be used to display the model with largest adjusted R square or smallest  BIC. 
+ 
+```{r}
+which.max(reg.summary$adjr2)
+```
+
+```{r}
+which.min(reg.summary$bic)
+```
+
+We can also plot these adjusted measurements of model fitness as a function of the size of the model. 
+In the plots the best models according to each of the criteria are marked in red.
+
+
+```{r}
+ggplot()+ 
+ geom_point(aes(x=c(1:13),y=reg.summary$adjr2))+
+  geom_line(aes(x=c(1:13),y=reg.summary$adjr2)) +
+  geom_point(aes(x=7,y=reg.summary$adjr2[7]), color="red")+
+  xlab("Number of variables")+
+  ylab("Adjusted R squared")
+
+```
+
+
+```{r}
+ggplot()+ 
+ geom_point(aes(x=c(1:13),y=reg.summary$bic))+
+  geom_line(aes(x=c(1:13),y=reg.summary$bic)) +
+  geom_point(aes(x=5,y=reg.summary$bic[5]), color="red")+
+  xlab("Number of variables")+
+  ylab("BIC")
+```
+
+One can also use the command *coef* to see the coefficients of the best model for a given number of variables.
+So we can get the coefficients for the best model according to the adjusted R squared:
+
+```{r}
+coef (regfit.full ,7)
+```
+
+
+And the coefficients for the best model according to the BIC:
+
+```{r}
+coef (regfit.full ,5)
+```
+
+
+
+## Forward and backward stepwise selection
+
+The function *regsubsets()* performs forward or backwards stepwise selection. One uses *method="forward"* to do forward selection.
+
+```{r}
+regfit.fwd = regsubsets( PVTotal~. , data=Mir, nvmax =13, method="forward")
+```
+
+Then we can use the *summary* command followed by *which.max* or *which.min* to get the best model according to the adjusted R squared or BIC.
+
+```{r}
+reg.fwd.summary=summary(regfit.fwd)
+which.max(reg.fwd.summary$adjr2)
+which.min(reg.fwd.summary$bic)
+```
+
+We can see that in this case, we obtained the same models with the best subset selection and with the forward stepwise selection.
+
+```{r}
+coef(regfit.full ,7)
+coef(regfit.fwd ,7)
+```
+
+
+```{r}
+coef(regfit.full ,5)
+coef(regfit.fwd ,5)
+```
+
+## Exercise
+Use the *regsubsets()* function to select the best model using the backwards stepwise selection and  BIC for the quality of fit. How do the results compare with the results previously obtained?
+
+```{r}
+# write your solution here
+```
+
+
+## Validation set for model selection
+
+To estimate the accuracy of the model for predictions, one must do the fitting only on a training data set.
+
+We start by splitting the data into a training set and a test set. The training set has 2/3 of the observations and the rest is in the test set. 
+```{r}
+set.seed(7)
+index.train1 = sample (375, round(2*375/3))
+Mir.train1 <-Mir[index.train1, ]
+Mir.test1 <-Mir[-index.train1, ]
+```
+
+Then we apply *regsubsets()* to to the training data set to perform best subset selection.
+
+```{r}
+regfit.best = regsubsets(PVTotal~. , data=Mir.train1, nvmax =13)
+```
+
+Then we have to calculate the validation set error for the best model of each possible size. 
+Unfortunately *regsubsets()* does not have a *predict()* function, so the implementation is a bit more complicated than usually.
+
+We start by generating a matrix with the test data set, using the command *model.mtarix*.
+```{r}
+test.mat=model.matrix(PVTotal~. , data=Mir.test1)
+```
+
+Then we go over all possible set sizes, calculate the prediction error for the respective models and save them in a variable called *m.errors*.
+
+```{r}
+m.errors=rep(0,13)
+for (i in 1:13){
+  coef.i=coef(regfit.best,id=i)
+  pred=test.mat[,names(coef.i)]%*% coef.i
+  m.errors[i]=mean((Mir.test1$PVTotal-pred)^2)
+}
+```
+
+Then we can see what is the best model by selecting the one that has the smallest error on the test data.
+```{r}
+which.min(m.errors)
+```
+
+This method chose a model with 5 variables.
+Now we perform the best subset selection on **all** the data, and choose the model with 5 variables.
+
+```{r}
+regfit.best.all = regsubsets(PVTotal~. , data=Mir, nvmax =13)
+```
+
+The model with 5 variables has the following variables and coefficients:
+
+```{r}
+coef(regfit.best.all,5)
+```
+
+
+# Ridge regression and Lasso
+
+In this part of the lab we use the command *glmnet()* from the *glmnet* library to fit ridge regression models and lasso models. The command *glmnet()* does not have the same syntax as *lm*, *glm* and *lda* models we have fitted in previous labs. It works with a vector input *y* containing the values of the output variable, and a matrix *x* containing all the predictor variables. In the matrix *x* each column has the values of one of the predictor variables. 
+We start by preparing the data set in *Mireault2.csv*. We want to have *PvTotal* as outcome variable and all the other variables as predictors. 
+We create a vector *y* containing the output variable.
+```{r}
+y= Mir$PVTotal
+```
+
+We create a matrix with the predictor variables using the command *model.matrix*. 
+```{r}
+x= model.matrix(PVTotal~.,Mir)[,-1]
+```
+
+## Ridge regression
+
+The command *glmnet* has a parameter *alpha*, which defines what method to be used: 0 for ridge regression and 1 for Lasso. We start by using ridge regression.
+We set the parameter $\lambda$ of the ridge regression to 0. This is the same as fitting a model with least squares. 
+Finally we set the option *standardize=FALSE*, to modify the default setting of *glmnet()* of standardizing the variables.
+
+```{r}
+model1 <- glmnet (x ,y , alpha =0 , lambda = 0,standardize=FALSE)
+```
+
+The command function *coef()* shows the parameter estimates for the model.
+
+```{r}
+coef(model1)
+```
+
+## Exercise
+Use the command *lm()* to fit the same model. Verify that the parameter estimates are the same.
+
+```{r}
+# write your solution here
+```
+
+
+Now we fit a real ridge regression. For example, we can use a $\lambda$  of 100. Before we fit again a least square model but with standardized variables, for comparison.
+
+
+```{r}
+model2 <- glmnet (x ,y , alpha =0 , lambda = 0)
+```
+
+
+```{r}
+ridge.mod1 <- glmnet (x ,y , alpha =0 , lambda = 100)
+```
+
+We can look at the estimated coefficients of both models.
+
+```{r}
+coef(model2)
+coef(ridge.mod1)
+```
+
+Observing the coefficients ones sees that several coefficiets of the penalized model are estimated to much smaller values.
+
+## Exercise
+
+Try what happens when you use a much larger and a much smaller value of $\lambda$. Use, for example $\lambda=2$ for one fitting and $\lambda=10000$ for another fitting. Comment on the estimated values of the coefficients. 
+
+```{r}
+# write your solution here
+```
+
+
+
+## Estimating the test mean square error
+
+If one wants to use ridge regression for predictions, one is interested in estimating the mean square error *MSE* on a test data set. 
+
+To estimate the test error we can use the previous split of the data into a training set and a test set. Now we create the *y* vectors and the *x* matrices for both the training and the test data.
+
+```{r}
+y.train1 <-y[index.train1 ]
+x.train1 <-x[index.train1, ]
+y.test1 <-y[-index.train1 ]
+x.test1 <-x[-index.train1, ]
+```
+
+We choose again $\lambda=100$ and fit a ridge regression model on the training set.  
+
+```{r}
+ridge.train1 <-glmnet (x.train1 ,y.train1 , alpha =0 , lambda = 100)
+```
+
+We use the function *predict.glmnet* to apply the estimated model on the test data set.
+
+```{r}
+ridge.pred1 <- predict.glmnet(ridge.train1, newx=x.test1)
+```
+
+Finally we can calculate the test mean standard error.
+```{r}
+mean((ridge.pred1-y.test1)^2)
+```
+
+The test MSE is 398.59.
+
+We can choose another $\lambda$ , let us say 2, and repeat the previous steps.
+
+```{r}
+ridge.train2 <-glmnet (x.train1 ,y.train1 , alpha =0 , lambda = 2)
+ridge.pred2 <- predict.glmnet(ridge.train2, newx=x.test1)
+mean((ridge.pred2-y.test1)^2)
+```
+
+The test MSE is 359.48, which is smaller than for $\lambda=100$.
+
+## Exercise 
+Does the ridge regression with $\lambda=2$ perform better on test data than the least squares estimation?
+
+```{r}
+# write your solution here
+```
+
+
+## Finding the best parameter using cross-validation
+
+To set a good value of $\lambda$ we can use cross-validation. To do this we will use the cross-validation function *cv.glmnet()*. The function by default performs ten-fold cross-validation. 
+
+```{r}
+set.seed(1)
+cv.out <- cv.glmnet(x.train1,y.train1,alpha=0, nfolds=10)
+```
+
+The object *cv.out* contains, among other information, the values of the $\lambda$ used; the corresponding mean cross-validated errors, and their estimated standard errors. By using the commando *plot* on the object *cv.out* one obtains a figure showing the MSE as a function of $\log(\lambda)$.
+
+```{r}
+plot(cv.out)
+```
+
+*cv.out* also contains the $\lambda$ for which the error in minimal, which in this case is 4.536.
+
+```{r}
+bestlam<-cv.out$lambda.min
+bestlam
+```
+
+Now we can use the estimated best $\lambda$ to fit a model on all the training data. Finally we can apply this model to the test data and get the test MSE for the chosen model. 
+
+```{r}
+ridge.train3 <-glmnet (x.train1 ,y.train1 , alpha =0 , lambda = bestlam)
+ridge.pred3 <- predict.glmnet(ridge.train3, newx=x.test1)
+mean((ridge.pred3-y.test1)^2)
+```
+
+The test MSE is 352.01, which is smaller than the test MSE for other values of $\lambda$, as expected. 
+
+## Lasso 
+The lasso model can be fit with the same function as the ridge regression, but setting alpha to 1. 
+
+## Exercise
+Fit lasso models with $\lambda=2$ and $\lambda=100$ on the training data set and calculate the corresponding test MSEs. Then use cross-validation to choose the best $\lambda$. For this value of $\lambda$ calculate the test MSE. Compare the results with those obtained with the ridge regression. What are the possible advantages of using lasso models?
+
+
+```{r}
+# write your solution here
+```

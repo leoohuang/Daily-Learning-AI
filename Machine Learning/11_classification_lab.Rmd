@@ -1,0 +1,402 @@
+---
+title: "Classification"
+author: "Rita Almeida"
+date: "Autumn 2025"
+output: pdf_document
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, tidy = FALSE, size = 'footnotesize', fig.align = 'center', cache = FALSE)
+```
+
+We start by loading the libraries needed in this lab. If you do not have these packages installed you must start by doing this. For example if you do not have the package *MASS*, you must run the command *install.packages("MASS")*.
+```{r message= FALSE}
+library('tidyverse')
+library("gridExtra")
+library("MASS")
+library("class")
+library("ISLR")
+theme_set(theme_bw())
+```
+
+# Logistic regression
+
+We will use a data set from a gesture perception experiment, which is described in the course book *Statistics for Linguists, an introduction using R, from B Winter* and also in the article Hassemer, J., & Winter, B. (2016) *Producing and perceiving gestures conveying height or shape.* Gesture, 15(3), 404–424. 
+In short, the authors collected information about how onlookers inferred information depending on hand gestures. 
+Their hypothesis was that when the pinkie finger, the ring finger, and the middle finger are curled in, the distance between the index finger and the thumb pad are interpreted as *height* of an object. In opposition, when the fingers are extended the interpretation is more likely to be that the C-shape formed by the index finger and thumb refer to the *shape* on an object.
+To test this hypothesis the authors showed a group of participants pictures of a single hand shape,  where the fingers were curled to different degrees in a continuum from most extended (1) to most curved (9). There were pictures with 9 positions in the continuum. The task of the subjects was to choose *height* or *shape* for the picture shown, according to how they interpreted the gesture to be indicative of the size or shape of an object. 
+
+## Data visalization
+
+The data is on the file *hassemer_winter_2016_gesture.csv*. We will start by loading the file and visualize the first rows.
+
+```{r}
+ges <- read_csv('hassemer_winter_2016_gesture.csv')
+head(ges, 10)
+```
+
+The data set *ges* contains several variables. Here we will use the following:
+
+*choice*, categorical variable containing the choice of the subject for a given picture.
+
+*pinkie_curl*, variable taking values from 1 to 9, indicating the curvature of the pinkie, ring and middle fingers.
+
+*index_curve*, variable taking values from 1 to 6, indicating the curvature of the index finger.
+
+
+To get an impression of the data, one can look at a table of the distribution of the values of the variable *pinkie_curl*. That is, how many times each picture was used in the experiment. Note that this is the main variable which the authors thought to be important for the information inferred by the subjects. 
+
+```{r}
+ table(ges$pinkie_curl)
+```
+
+Next, we look at the counts on the two possible choices made by the subjects. 
+```{r}
+table(ges$choice)
+```
+
+The same table can be shown in terms of proportion of the choices, instead of the actual counts, using the command *prop.table()*. The proportion table can give a better intuition of the data. 
+```{r}
+prop.table(table(ges$choice))
+```
+
+Finally, we look at a table with the counts of *height* and *shape* for each value of *pinkie_curl*. It seems that when the fingers are more curved (*pinkie_curl* 8 or 9) there are more choices of *height* than *shape*, as one might expect.
+
+```{r}
+ xtab <- table(ges$pinkie_curl, ges$choice)
+xtab
+```
+
+The same table can be displayed in terms of proportions.
+```{r}
+ round(prop.table(xtab, 1), digits = 2)
+```
+
+## Logistic regression with one explanatory variable
+
+Our first task is to see if the variable *pinkie_curl* can be used to classify the choices into *shape* or *height*. To do this we start by telling R that *choice* is a categorical variable by converting *choice* into a factor, with *shape* as the baseline level. Then we use the command *contrast()* to check that indeed *shape* corresponds $0$ and *height* to $1$.
+
+
+```{r}
+ges$choice <- factor(ges$choice, levels = c("shape","height"))
+contrasts(ges$choice)
+```
+
+Next we divide the data into two sets: the training data set *ges.Train* with 209 observations, and the test data set *ges.Test* with 100 observations.
+```{r}
+ges.Train <- ges[1: 209, ]
+ges.Test <- ges[210: 309, ]
+```
+
+We fit a logistic model on the training data, using as only explanatory variable *pinkie_curl*. To fit a logistic regression we use the command *glm()*, which has a similar sintax to the command *lm()* we used to fit linear regression models. The only difference is that to use *glm()* we have to give the argument *family='binomial'* to indicate that we want to fit a logistic model. 
+After fitting the model we can look at the estimated coefficients using the *summary()$coef* command.
+
+```{r}
+ges_m <- glm(choice ~ pinkie_curl, data = ges.Train,
+             family = 'binomial')
+summary(ges_m)$coef
+```
+
+The results show that the log odds of observing a *height* response increase by 0.1377 for each step along the *pinkie_curl* variable.
+We next use the function *predict()* to generate the estimated logistic regression curve. We use *type="response"* to generate probabilities, instead of log odds, for each value of pinkie_curl.
+
+```{r}
+ges_preds <- tibble(pinkie_curl = 1:9)
+ges_preds$probs <- predict(ges_m,ges_preds, type="response")
+ges_preds$probs
+```
+
+Finally we plot the probabilities as a function of *pinkie_curl*. We start by generating probabilities for intermediate levels of the explanatory variable, to generate the estimated regression function shown in the red dotted line.
+
+```{r}
+ges_preds2 <- tibble(pinkie_curl = seq(1, 9, by=0.01))
+ges_preds2$probs <- predict(ges_m,ges_preds2, type="response")
+```
+
+And then we generate the plot.
+```{r}
+ggplot() +
+geom_point(aes(x = ges_preds$pinkie_curl, y= ges_preds$probs)) +
+  geom_line(aes(x = ges_preds2$pinkie_curl, y=ges_preds2$probs ),color="red", linetype="dotted")+
+  xlab("pinkie curl") + ylab("Probability of choice=height") + scale_x_continuous(breaks = 1:9) 
+```
+
+Now that we have a model fitted using the training data set, we can use it to make a classification of the data on the test data set. 
+We start by predicting the probabilities for the test set. (In this case the *pinkie_curl* variable only takes 9 values, so we actually already had these probabilities.)
+
+```{r}
+ges.Test$probs <- predict(ges_m,ges.Test,type="response")
+```
+
+Then we have to generate the *choices* (*height* or *shape*) according to the fitted model. We attribute *height* to *choice* if the probabilities are larger than $0.5$ according to our fitted model. We attribute *shape* to the variable *choice* otherwise.
+We then display a confusion matrix and calculate the fraction of correct classifications and incorrect classifications.
+
+```{r}
+ges.Test$preds <- rep("shape",100)
+ges.Test$preds[ges.Test$probs >0.5]="height"
+table(ges.Test$preds,ges.Test$choice)
+mean(ges.Test$preds==ges.Test$choice)
+mean(ges.Test$preds!=ges.Test$choice)
+```
+
+We can see that the model correctly predicted the *choice* of *shape* in 60 cases and correctly predicted the choice of *height* in 12 cases. However, the model predicted *shape* in 25 cases where the subjects chose *height*.
+
+The error rate on the test data was 28%, and the accuracy 72%.
+
+## Logistic regression using several explanatory variables
+
+In this section we use more explanatory variables in the model. In particular we want to use the variable *index_curve* and a quadratic term of the curving of the pinkie, ring and middle fingers. For this we start by creating a variable that is the square of the *pinkie_curl*, after mean centering, and call it *pinkie_sq*.
+
+```{r}
+ges$pinkie_sq <- (ges$pinkie_curl-mean(ges$pinkie_curl))^2
+```
+
+Next we divide the data into new training and test sets, *ges.Train2* and *ges.Test2*, respectively.
+```{r}
+ges.Train2 <- ges[1: 209, ]
+ges.Test2 <- ges[210: 309, ]
+```
+
+Then we fit a new logistic regression model with the three explanatory variables mentioned: *pinkie_curl*, *pinkie_sq* and *index_curve*. 
+
+```{r}
+ges_m2 <- glm(choice ~ pinkie_curl + pinkie_sq + index_curve, data = ges.Train2,
+             family = 'binomial')
+summary(ges_m2)$coef
+```
+
+Looking at the estimate log odds, it seems that all three variables contribute to the choice. 
+
+We proceed by applying the new fitted model to the test data. Next we follow the steps above to display a confusion matrix, and calculate the fraction of correct classifications and incorrect classifications.
+
+```{r}
+ges.Test2$probs <- predict(ges_m2,ges.Test2,type="response")
+
+ges.Test2$preds <- rep("shape",100)
+ges.Test2$preds[ges.Test2$probs>0.5]="height"
+table(ges.Test2$preds,ges.Test2$choice)
+mean(ges.Test2$preds==ges.Test2$choice)
+mean(ges.Test2$preds!=ges.Test2$choice)
+```
+
+The classification accuracy is better with this model, reaching  77% correct predictions. In particular, this model shows increase correct classification of the *height* choices. 
+
+# Linear discriminant analysis
+
+In this section we will apply linear discriminant analysis (LDA) to the same data set we used above. 
+One can do this in R by using the *lda()* command, which is part of the library *MASS* and works in the same way as the  *lm()* command we have used to fit linear regressions.
+We use for the classification the same variables we used above, that is *pinkie_curl*, *pinkie_sq* and *index_curve*. 
+We start by fitting the model using the training data set.
+
+```{r}
+ges_m3 <- lda(choice ~ pinkie_curl + pinkie_sq + index_curve, data = ges.Train2)
+```
+
+And then we check the model:
+
+```{r}
+ges_m3
+```
+
+The output shows that $\hat{\pi_s}=0.57895$ and  $\hat{\pi_h}=0.42105$, that is $\approx 58\%$ of the training choices were *shape* and  $\approx 42\%$ were *height*. 
+
+It also shows the group means which are used as estimators of $\mu_k$. 
+From these means one sees that it seems that a choice of *height* is associated with higher values of *pinkie_curl* and *pinkie_sq*, but smaller values of *index_curve*.
+
+The coefficients of  linear discriminants give the linear combination of the predictors which is used for the LDA classification.
+If $0.1230453\times pinkie\_curl+0.1003753\times pinkie\_sq - 0.5224447\times index\_curve$ is large then the LDA classifies the choice as *height* and if it is low as *shape*.
+
+Now that we have the linear discriminant, we can apply it to the test data set to check the accuracy of the model for new data. 
+
+```{r}
+ges_m3.pred <- predict(ges_m3,ges.Test2)
+```
+
+The output *ges_m3.pred* is a list with three elements:
+
+*ges_m3.pred$class* which contains the classification results (*shape* or *height*) for each observation.
+
+*posterior* that contains the posterior probabilities $\Pr(Y=K\vert X=x)=\frac{\pi_k f_k(x)}{\sum^{K}_{l=1} \pi_l f_l(x))}$
+
+*x* that contains the linear discriminants
+
+```{r}
+head(ges_m3.pred$class,10)
+```
+
+```{r}
+head(ges_m3.pred$posterior,10)
+```
+
+```{r}
+head(ges_m3.pred$x,10)
+```
+
+Once we have the classification, we can generate a confusion matrix, as before.
+
+```{r}
+LDA.pred <- (ges_m3.pred$class)
+table(LDA.pred, ges.Test2$choice)
+```
+
+We can also calculate the fraction of correct classifications and incorrect classifications.
+
+
+```{r}
+mean(LDA.pred==ges.Test2$choice)
+```
+
+
+```{r}
+mean(LDA.pred!=ges.Test2$choice)
+```
+
+One could also generate the predictions based on the posterior probabilities and predict *height* every time the corresponding posterior is larger or equal to 0.5. 
+
+
+```{r}
+LDA.pred2 <- (ges_m3.pred$posterior[,2]>=0.5)
+table(LDA.pred2, ges.Test2$choice)
+```
+
+## Exercise
+
+Imagine that one would want to do the same classification, but use a less strict threshold to predict the choice to be *height*. For example one could predict the choice to be *height* for a posterior larger or equal to 0.4. Generate the confusion matrix for this case. 
+Now repeat the procedure for an even less strict threshold of 0.3 and generate the respective confusion matrix.  
+How does the number of true positives and false positives compare with those calculated with the threshold above?
+
+```{r}
+pred_0.4 <- (ges_m3.pred$posterior[,2]>=0.4)
+table(pred_0.4,ges.Test2$choice)
+pred_0.3 <- (ges_m3.pred$posterior[,2]>=0.3)
+table(pred_0.3,ges.Test2$choice)
+```
+
+
+# K-nearest neighbors
+
+To perform a k-nearest neighbors classification we use the function *knn()* which is a part of the library *class*. 
+The function *knn()* does not work in the same way as the regression functions we used before. 
+*knn* needs four different inputs:
+
+1. A matrix containing the predictors for the training data set.
+
+2. A matrix containing the predictors for the test data set.
+
+3. A vector containing the output (class labels) for the training data set.
+
+4. A value for $k$ to use in the algorithm. 
+
+This section follows the lab in the course book James et al. *An introduction to statistical learning*. We use the data set *Caravan* which is part of the library *ISLR*.
+The data set is from an insurance company and contains observations of 86 variables for 5822 individuals. 
+The outcome or response variable we want to use is *Purchase*, which takes the value *Yes* for individuals that have purchased a caravan insurance policy and *No* for the others.
+Variables 1 to 43 contain sociodemographic data and the variables 44 to 86 data about product ownership.
+*Purchase* is the variable 86 in the data set. 
+
+We start by looking at the proportion of individuals that have purchased a caravan insurance policy.
+```{r}
+round(prop.table(table(Caravan$Purchase)),digits=4)
+```
+
+We see that less than 6% of the individuals have the insurance, so the outcome variable is very unbalanced.
+
+The KNN algorithm involves computing the distance between observations. When the different variables have very different scales this poses a problem. For the algorithm, a salary difference of 1000 dollars is much larger, and hence more determinant, than an age difference of 50 years. 
+To avoid this problem, one standardizes the variables before doing the classification.
+That is for each variable, one subtracts the variable mean from each observation, and divides it by the standard deviation. In this way all variables are scaled to have mean 0 and standard deviation 1. 
+
+We start by standardizing the data, after excluding the last variable, which is the variable *Purchase*, our categorical outcome variable.
+
+```{r}
+stand.X <- scale(Caravan[,-86])
+```
+
+We can verify with the first variable of the data set that it is now standardized.
+Before standardization the mean and standard deviation of this variable were:
+```{r}
+mean(Caravan[,1])
+sd(Caravan[,1])
+```
+
+After the standardization, the same variable as the following mean and standard deviation:
+
+```{r}
+mean(stand.X[,1])
+sd(stand.X[,1])
+```
+
+Now we split the data set into a test set containing the first 1000 observations, and a training test containing the rest of the observations.
+
+```{r}
+test.X <- stand.X[1:1000,]
+train.X <-stand.X[1001:5822, ]
+```
+
+Then, we create vectors with the outcome variable *Purchase* for the test set and for the training set.
+
+```{r}
+test.Y <- Caravan$Purchase[1:1000]
+train.Y <-Caravan$Purchase[1001:5822]
+```
+
+Now we have all the inputs to *knn()*, and we train the model considering $k=1$.
+```{r}
+set.seed(1)
+knn.pred <- knn(train.X,test.X,train.Y,k=1)
+```
+
+To check the accuracy of the predictions we can do as before:
+```{r}
+mean(test.Y==knn.pred)
+mean(test.Y!=knn.pred)
+```
+
+We see that KNN model gives a correct prediction in more than 88% of the cases. The error rate is smaller than 12%.
+This should be interpreted with some care, given that the outcome variable *Purchase* was so unbalanced. If we had a classifier that just predicts *Purchase=No* independently of the observations, the classifier would have an error rate of 6%, since only 6% of the individuals have purchased an insurance!
+To understand the results and evaluate if this classifier is useful, it is helpful to look at the confusion table. 
+The table can be obtained using the same code as before:
+
+```{r}
+table(knn.pred,test.Y)
+```
+
+If the company would have tried to sell insurance policies to a random selection of individuals, they would have 6% of success rate. However, if one would try to sell it to the 77 individuals that the KKN model predicts will buy the insurance, then the success rate would be 11.7%, $(0.117=9/(68+9))$. This is double the rate that would have been obtained with random guessing!
+
+## Exercise
+Try the KNN classification, but now using k=3 and then k=5. Comment the results obtained.
+
+```{r}
+set.seed(1)
+knn.pred <- knn(train.X,test.X,train.Y,k=3)
+mean(test.Y == knn.pred)
+mean(test.Y != knn.pred)
+
+knn.pred <- knn(train.X,test.X,train.Y,k=5)
+mean(test.Y == knn.pred)
+mean(test.Y != knn.pred)
+```
+
+
+## Exercise
+
+Use the *Caravan* data to perform the same classification, but this time using LDA. 
+Generate the predictions based on the posterior probabilities with a threshold of 0.5 and then with a threshold of 0.25. Comment the results.
+
+```{r}
+train.data <- data.frame(train.X, Purchase = train.Y)
+test.data <- data.frame(test.X)
+
+lda.fit <- lda(Purchase~.,data=train.data)
+lda.probs <- predict(lda.fit,newdata = test.data)$posterior[,"Yes"]
+
+pred_0.5 <- rep("No",1000)
+pred_0.5[lda.probs>0.5] = "Yes"
+table(pred_0.5,test.Y)
+
+pred_0.25 <- rep("NO",1000)
+pred_0.25[lda.probs >0.25] = "Yes"
+table(pred_0.25,test.Y)
+
+```
+

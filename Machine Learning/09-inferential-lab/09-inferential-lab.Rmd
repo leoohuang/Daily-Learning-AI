@@ -1,0 +1,306 @@
+---
+author: Marcin Włodarczak
+title: Inferential statistics II
+output: pdf_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r echo=FALSE}
+library('knitr')
+options(width=80)
+opts_chunk$set(tidy=FALSE, size='footnotesize', fig.align='center', out.width='0.8\\textwidth', cache=FALSE)
+``` 
+
+# Preliminaries
+
+As usual, we start by loading `tidyverse`:
+```{r message=FALSE}
+library('tidyverse')
+theme_set(theme_bw())
+```
+
+In this class, we will also use the `broom` library, which will help us  extract model parameters.
+```{r}
+library('broom')
+```
+
+As before, we will seed the random number generator to make sure we are getting reproducible results:
+```{r}
+set.seed(500)
+```
+
+# Regression as an estimation problem
+
+We start by generate a sample ($N = 50$) with a known linear relationship between `x` and `y` plus some normally distributed noise:
+```{r}
+beta0 = 3   # Intercept
+beta1 = -2  # Slope
+
+n <- 50 # Sample size
+samp <- tibble(x = rnorm(n),
+               y = beta0 + beta1 * x + rnorm(n))
+```
+
+In this case, we know that the true relationship is $y = 3 - 2 \times x$, however the estimates in our sample will be always somewhat off:
+```{r}
+m <- lm(y ~ x, samp)
+coefficients(m)
+```
+
+We can now plot the estimated regression line (in black) alongside the "true" regression line (in red):
+```{r message=FALSE}
+ggplot(samp, aes(x, y)) +
+  geom_point() +
+  geom_smooth(method = 'lm', se = FALSE, color = 'black') +
+  geom_abline(slope = beta1, intercept = beta0, color = 'red', linewidth = 1)
+```
+
+## Exercise
+
+Run the code below several times and observe how the regression line changes from sample to sample. Next, decrease and increase sample size. What happens as you do so?
+```{r eval=FALSE}
+n <- 50 
+samp <- tibble(x = rnorm(n),
+              y = beta0 + beta1 * x + rnorm(n))
+
+ggplot(samp, aes(x, y)) +
+  geom_point() +
+  geom_smooth(method = 'lm', se = FALSE, color = 'black') +
+  geom_abline(slope = beta1, intercept = beta0, color = 'red', linewidth = 1)
+```
+
+
+# 95% confidence interval
+
+We are now ready to enable the 95% confidence interval around the regression line, we can do that by setting `se` to `TRUE` or by removing the whole `se = FALSE` expression. 
+```{r message=FALSE}
+n <- 50
+samp <- tibble(x = rnorm(n),
+              y = beta0 + beta1 * x + rnorm(n))
+
+ggplot(samp, aes(x, y)) +
+  geom_point() +
+  geom_smooth(method = 'lm', color = 'black') +
+  geom_abline(slope = beta1, intercept = beta0, color = 'red', linewidth = 1)
+```
+
+This 95% confidence interval will, on repeated sampling, include the true regression line in 95% of cases.
+
+## Exercise
+
+Re-run the code block above, observe how in the great majority of cases the red regression line falls within the confidence interval. Next, change the sample size upwards and downwards again. What happens to the confidence interval?
+
+
+# Multiple regression
+
+Let's now fit a multiple regression model. We start by generating some data -- in the following example `x1` has a relatively large effect on `y`, `x2` has a relatively small effect and `x3` is completely unrelated to `y`:
+```{r}
+n <- 30
+d <- tibble(x1 = rnorm(n),
+            x2 = rnorm(n),
+            x3 = rnorm(n),
+            y = 2 + 10 * x1 + 0.5 * x2 + rnorm(n))
+```
+
+Here is the model including all three predictors:
+```{r}
+m <- lm(y ~ x1 + x2 + x3, d)
+summary(m)
+```
+
+# Coefficients
+
+We can extract the coefficients table using `tidy`:
+```{r}
+tidy(m)
+```
+
+By now you should be very comfortable interpreting the first column in this table. But what about the other values?
+
+First, let's demonstrate that the t-value is indeed equal to the estimate divided by its standard error:
+$$t = \frac{\hat{\beta}}{SE_{\hat{\beta}}}$$
+```{r}
+tidy(m) %>%
+  mutate(statistic_manual = estimate / std.error) %>%
+  select(statistic, statistic_manual)
+```
+
+We are not going to calculate the p-values by hand but notice that the effects of `x1` and `x2` are both significant while `x3`, which was not related to `y`, is not.
+
+## Exercise
+
+Let's revisit the `lexdec` (lexical decision, see `?lexdec` for a reminder) data set from the `languageR` package. 
+
+Say we have a hypothesis that both word frequency and its size rating have an effect on reaction times. Let's obtain these values for each word:
+```{r}
+library('languageR')
+data(lexdec)
+
+lexdec <- lexdec %>%
+  group_by(Word) %>%
+  summarise(Frequency = first(Frequency),
+            meanSize = first(meanSize),
+            RT = mean(RT))
+
+head(lexdec)
+```
+
+Fit a regression model predicting reaction time from the other two predictors and interpret the coefficients table.
+```{r}
+# Write your solution here.
+```
+
+Next, do the same for a model with standardised coefficients:
+```{r}
+# Write your solution here.
+```
+
+# Does the absolute value of slope matter?
+
+You might think that the reason that `x2` is significant `x3` is not is the *absolute* value of the estimate. It is not! Again, we know that:
+$$t = \frac{\hat{\beta}}{SE_{\hat{\beta}}}$$
+Thus, the t-value (and, consequently, the p-value) is related to both the estimate **and** its standard error. For a given value of $\hat{\beta}$, as standard error increases, the absolute value of t will decrease (and p-value will increase).
+
+We simulate this by reducing the standard deviation of `x2`, which results in its standard error increasing, which in turn inflates the p-value:
+```{r}
+n <- 30
+d <- tibble(x1 = rnorm(n),
+            x2 = rnorm(n, 0, 0.5),
+            x3 = rnorm(n),
+            y = 2 + 10 * x1 + 0.5 * x2 + rnorm(n))
+
+tidy(lm(y ~ x1 + x2 + x3, d))
+```
+
+## Exercise
+
+You will remember from the previous class that standard error decreases as sample size increases. Your task is to demonstrate that this is also the case in regression. Let's go back to our population, draw a sample, fit a simple regression model and inspect the standard errors:
+```{r}
+n <- 50
+d <- tibble(x = rnorm(n),
+            y = -4 + 2 * x + rnorm(n))
+
+tidy(lm(y ~ x, d))
+```
+
+Re-run the code block above changing sample size. Can you reproduce the effect of sample size on standard effect? What effect does it have on t and p-values?
+
+```{r}
+# Write your solution here.
+```
+
+# Categorical predictors 
+
+Let's now look at a scenario involving a categorical predictor with two levels:
+```{r}
+d_cat <- tibble(score = c(rnorm(50, 10, 1), rnorm(50, 9, 1)),
+                group = rep(c('A', 'B'), each = 50))
+
+ggplot(d_cat, aes(group, score)) +
+  geom_boxplot()
+
+summary(lm(score ~ group, d_cat))
+```
+
+As we can see in the summary above, group `A` is mapped onto the intercept. The estimate for group `B` is the difference in group means and the t- and p-values tell you whether this difference is statistically significant.
+
+Note that you get identical output if you run a test (we set `var.equal` to `TRUE` to disable correction for different variances, which is the default):
+```{r}
+t.test(score ~ group, d_cat, var.equal = TRUE)
+```
+
+How about three categories?
+```{r}
+d_cat3 <- tibble(score = c(rnorm(50, 10, 1), rnorm(50, 9, 1), rnorm(50, 10, 1)),
+                 group = rep(c('A', 'B', 'C'), each = 50))
+
+ggplot(d_cat3, aes(group, score)) +
+  geom_boxplot()
+
+summary(lm(score ~ group, d_cat3))
+```
+
+Here the situation is similar: group `A` is mapped onto the intercept and the parameters involve pairwise differences between group means: `A`-`B` and `A`-`C`.
+
+## Exercise
+
+In this exercise we revisit the data set from Lynott, D. and Connell, L. (2009). *Behavior Research Methods* 41: 558. https://doi.org/10.3758/BRM.41.2.558. As you might remember, the study measured the strength of association between adjectives and different modalities (auditory, haptic, olfactory etc.). 
+
+The data is saved in the file `lynott09.csv`. **Remember to set the working directory to the location of the `Rmd` file before you attempt to read in the data.**
+```{r message=FALSE}
+lynott09 <- read_csv('lynott09.csv')
+```
+
+Here is the model we fitted previously. It predicts the degree to which adjectives with different dominant modalities (column `DominantModality`) are tied to a *single* perceptual modality (column `ModalityExclusivity`). 
+
+```{r}
+m_lynott09 <- lm(ModalityExclusivity ~ DominantModality, lynott09)
+summary(m_lynott09)
+```
+
+Interpret the values in the coefficients table.
+
+
+# Model comparison
+
+In order to evaluate the overall contribution of group, we can compare the model above to an intercept only model using `anova`. Note that the F-value we get below is equal to the F-value in the model summary above:
+```{r}
+m1 <- lm(score ~ group, d_cat3)
+m0 <- lm(score ~ 1, d_cat3)
+anova(m1, m0)
+```
+
+The above test checks whether the model with `group` as a predictor fits the data significantly better (or reduces the amount of unexplained variance) compared to a model which does not include `group`, which in this case is the intercept-only model.
+
+The result also tells us that *at least one* of the group difference is significantly different from 0. This analysis is equivalent to the classic analysis of variance (ANOVA).
+
+## Exercise
+
+Using the `lynott09` data, test whether in the effect of `DominantModality` as a whole is statistically significant.
+```{r}
+# Write your solution here.
+```
+
+Note that this strategy does not have to involve a comparison against an intercept-only model. As an example, let's generate some data, where one of the predictors is numeric and the other is categorical with three levels.
+```{r}
+n <- 30
+d <- tibble(x1 = rnorm(n),
+            x2 = rep(c('A', 'B', 'C'), each = 10),
+            y = ifelse(x2 == 'B', 7, -1) + 4 * x1 + rnorm(n))
+```
+
+Above, all groups have the some slope (4) but the the intercept for group `B` is 7 while it equals -1 for the two other groups (do not worry about the code used to generate this data):
+```{r}
+ggplot(d, aes(x1, y, color = x2)) +
+  geom_point()
+```
+
+Here is the model describing the relationship:
+```{r}
+m <- lm(y ~ x1 + x2, d)
+summary(m)
+```
+
+As is always the case for catgorical predictors with more than two levels, the summary only includes comparisons with the reference level (in this case `A`). How would we test the overall effect of `x2`? We can simply compare the full model to a reduced model which includes `x1` as the only predictor:
+```{r}
+m_reduced <- lm(y ~ x1, d)
+anova(m, m_reduced)
+```
+
+## Exercise
+
+Refit the model above using `B` as the reference and repeat the comparison with the reduced model. Why are you getting the same value of F-statistic?
+```{r}
+# Write your solution here.
+```
+
+## Exercise
+
+Let's say you have a hypothesis that modality exclusivity of an adjective is linked to both the dominant modality and the length of a word. Test this hypothesis in the `lynott09` data. Is dominant modality as a whole a significant predictor in this model?
+
+```{r}
+# Write your solution here.
+```
+
+

@@ -1,0 +1,275 @@
+---
+title: "Data transformation"
+author: "Marcin Włodarczak"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+editor_options:
+  chunk_output_type: console
+output: pdf_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, tidy = FALSE, size = 'footnotesize', fig.align = 'center', out.width = '0.7\\textwidth', cache = FALSE)
+```
+
+As usual, we start by loading `tidyverse`:
+```{r message=FALSE}
+library('tidyverse')
+theme_set(theme_bw())
+```
+
+We will also need some helper code from `06-utils.R`:
+```{r}
+source('06-utils.R')
+```
+
+# Simple and multiple regression
+
+So far, we have talked about simple regression, that is models with a single predictor:
+```{r}
+d1 <- tibble(x = runif(50, -5, 5),
+             y = 5 + -9 * x + rnorm(50, 0, 1))
+summary(lm(y ~ x, d1))
+```
+
+Sadly, life is rarely so simple that a phenomenon can be adequately explained by a single variable. Usually, we need several predictors to account for a meaningful portion of variance in the data.
+
+Here is an example where `y` is a function of two variables, `x1` and `x2`, plus intercept and some normally distributed noise:
+```{r}
+d2 <- tibble(x1 = runif(20, 13, 27), 
+             x2 = runif(length(x1), -3, 11),
+             y = -2 + -6 * x1 + 7 * x2 + rnorm(length(x1), 0, 1))
+```
+
+We could of course analyse the relationship between `y` and `x1`:
+```{r}
+m1 <- lm(y ~ x1, d2)
+summary(m1)
+
+ggplot(d2, aes(x1, y)) +
+  geom_point() +
+  geom_smooth(method = 'lm', se = FALSE)
+```
+
+Similarly, we could analyse the relationship between `y` and `x2`:
+```{r}
+m2 <- lm(y ~ x2, d2)
+summary(m2)
+
+ggplot(d2, aes(x2, y)) +
+  geom_point() +
+  geom_smooth(method = 'lm', se = FALSE)
+```
+
+However, that does not give us a full picture since the value of `y` now depends on both `x1` and `x2`. Given that these effects are independent (i.e. the effect of `x1` does not depend on the value of `x2`, and vice versa), we can ask the following question: what is the effect of one of the predictors when the value of the other is held constant? In that way, we can investigate the effect of an individual predictor while controlling for the effect of the others.
+
+This is exactly what multiple regression lets us do. The way to build such a model is very similar to simple regression, we just specify all predictors on the right-hand side of the regression formula and separate them with `+`:
+```{r}
+m3 <- lm(y ~ x1 + x2, d2)
+summary(m3)
+```
+
+How do we interpret the coefficients of this model?
+
+- Intercept: the value of `y` when both `x1` and `x2` are 0 equals `r round(coefficients(m3)[1], 2)`.
+- `x1`: the change in `y` corresponding to an increas of 1 in `x1` **while holding `x2` constant** equals `r round(coefficients(m3)[2], 2)`.
+- `x1`: the change in `y` corresponding to an increas of 1 in `x2` **while holding `x1` constant** equals `r round(coefficients(m3)[3], 2)`.
+
+Another thing to notice is that the coefficient of determination ($R^2$) in this model is higher than in either of the simple models:
+```{r}
+summary(m1)$r.squared
+summary(m2)$r.squared
+summary(m3)$r.squared
+```
+
+## Exercise
+
+Let's continue with our old friend, the `beginningReaders` data set:
+```{r}
+library('languageR')
+data('beginningReaders')
+```
+
+This time we will group the data by `Word` and get a summary with each word's frequency, length (in characters) and mean reaction time.
+```{r}
+words <- beginningReaders %>%
+  group_by(Word) %>%
+  summarise(Freq = first(LogFrequency),
+            OrthLength = first(OrthLength),
+            RT = mean(LogRT))
+
+head(words)
+```
+
+We'll start with a simple model predicting reaction time from word frequency:
+```{r}
+words_m1 <- lm(RT ~ Freq, words)
+summary(words_m1)
+```
+
+What is the interpretation of coefficients in this model?
+
+
+As we can see from the $R^2$ value, the model accounts for around `r round(100 * summary(words_m1)$r.squared)`% of variance in the data. In other words, there is plenty of unexplained variation left.
+
+Create a model which **also** uses word length as a predictor. Compare the $R^2$ values and interpret model coefficients.
+
+```{r}
+# Write your solution here.
+```
+
+# Interpreting non-standardised coefficients
+
+Once we introduce predictors expressed on different scales, interpreting sizes of individual effects will be difficult since it will depend on the range of observed values. If we divide `x2` by 10, its effect will suddenly seem much larger than that of `x1`:
+```{r}
+d2 <- d2 %>%
+  mutate(x2_dec = x2 / 10)
+m4 <- lm(y ~ x1 + x2_dec, d2)
+coefficients(m4)
+```
+
+As you remember, the solution is to standardise predictors, effectively expressing them in units of standard deviation:
+```{r}
+d2 <- d2 %>%
+  mutate(x1_z = (x1 - mean(x1)) / sd(x1),
+         x2_z = (x2 - mean(x2)) / sd(x2))
+
+m5 <- lm(y ~ x1_z + x2_z, d2)
+summary(m5)
+```
+
+Notice that since we have only used linear transformations, the value of $R^2$ in models `m3`, `m4` and `m5` is identical.
+
+## Exercise
+
+Standardise predictors in the `beginningReaders` model and interpret its coefficients.
+
+```{r}
+# Write your solution here.
+```
+
+# Model diagnostics
+
+Fitting a model is easy but how do we know our model makes sense? On the one hand, the model makes sense when it is related to our research question. On the other hand, it also needs to satisfy the assumptions that all regression models make. These are largely related to distribution of residuals. As you remember, we can extract residuals from the model with the `residuals` function:
+```{r}
+res <- residuals(m5)
+```
+
+One important assumption is that residuals are supposed to be distributed normally. We can determine that by looking at their histogram:
+```{r}
+hist(res)
+```
+
+Another way is to compare the observed quantiles with quantiles of the normal distribution. In the perfect case, all data points should lie on the diagonal line:
+```{r}
+qqnorm(res)
+qqline(res)
+```
+
+The second important assumption concerns *homoscedacity* or constant variance irrespective of the fitted (i.e. predicted) values. In other words, when we plot residuals against the fitted values, we should see no obvious patterns -- residuals should be distributed pretty much randomly. We can obtain the fitted values using the `fitted` function:
+```{r}
+fitted_vals <- fitted(m5)
+plot(fitted_vals, res)
+```
+
+## Exercise
+
+Repeat the steps above for the `beginning_readers` model. Are any of the regression assumptions violated in this case?
+
+```{r}
+# Write your solution here.
+```
+
+# Indpendence assumption
+
+Another important assumption of linear regression models is that the data points need to be *independent* from each other. Let's consider the original `beginningReaders` data set again. We might be tempted to fit the model this data directly but there is one problem -- since each participant in the experiment rated all the words, we have many reaction time values per participant. We can get the actual numbers using `table()`:
+```{r}
+table(beginningReaders$Subject)
+```
+
+Clearly, data points from a single child are not independent and this will cause our model to be too confident about its own predictions. The way I have dealt with it here was to calculate mean reaction times per word or participant, which is not optimal since we reduce our data and loose useful information in the process. A more elegant solution to this problem is hierarchical (or mixed-effects) models, which allow you to specify to use the full data and instead tell the model what kind of interdependencies are present and how your data should be grouped. This material is covered in chapters 14 and 15 of the textbook.
+
+# Correlated predictors
+
+It is often the case that the predictors we are interested in are correlated. Below we generate correlated variables using the function `generate_correlated` defined in the file `06_utils.R`. It takes two arguments: the correlation coefficient (`rho`) and sample size (`n`)
+```{r}
+d_cor = generate_correlated(rho = 0.95, n = 50)
+```
+
+Let's if it worked:
+```{r}
+cor(d_cor$x1, d_cor$x2)
+ggplot(d_cor, aes(x1, x2)) +
+  geom_point()
+```
+
+When two variables are correlated, their values co-vary, that is change the value of one changes the other. This is clearly a problem since we said above that regression tries to estimate the effect of changing one predictor *while keeping the other ones constant*. Thus, when predictors are very strongly correlated, our models will have a hard time estimating individual (partial) effects.
+
+Let's see this in action by generating a dependent variable using the correlated predictors:
+```{r}
+d_cor <- d_cor %>%
+  mutate(y =  3 + 2 * x1 -6 * x2 + rnorm(nrow(d_cor), 0, 1))
+```
+
+We can now fit a simple regression model with one predictor:
+```{r}
+m_cor1 <- lm(y ~ x1, d_cor)
+coefficients(m_cor1)
+```
+
+Everything looks fine so far. But what happens when we add `x2` to the mix?
+```{r}
+m_cor1 <- lm(y ~ x1 + x2, d_cor)
+coefficients(m_cor1)
+```
+
+You can see that the coefficient values have changed quite a bit now. This is exactly because `lm()` cannot estimate individual effects.
+
+Another consequence of including correlated predictors is that small changes to the data can produce large differences in parameter estimates. Below we use `slice_sample` to create a random sample of 80% of rows from the `d_cor` data set and use that to refit the model. If you execute the following chunk a couple of time, you should be able to see coefficients estimates vary subsequently across runs.
+```{r}
+d_cor1 <- d_cor %>%
+  slice_sample(prop = 0.8)
+coef(lm(y ~ x1 + x2, d_cor1))
+```
+
+
+# Adjusted $R^2$
+
+We have seen that adding predictors increased the $R^2$ value. But what happens if we add a random predictor unrelated to our outcome variable?
+```{r}
+d2 <- d2 %>%
+  mutate(x3 = rnorm(nrow(d2)))
+m6 <- lm(y ~ x1 + x3, d2)
+```
+
+Compared to the model with `m1` as the only predictor, $R^2$ went up slightly:
+```{r}
+summary(m1)$r.squared
+summary(m6)$r.squared
+```
+
+This is generally the case: adding extra variables will result in a increase of $R^2$. However, we want our models to be *parsimonious*, that is we want to achieve a good fit using only a few relevant and strong predictors. To penalize models which use too many variables, we can use adjusted $R^2$ instead:
+```{r}
+summary(m1)$adj.r.squared
+summary(m6)$adj.r.squared
+```
+
+## Exercise
+
+Let's add a new column with some randomly generated to the `words` data:
+```{r}
+words <- words %>%
+  mutate(Rand = runif(nrow(words)))
+```
+
+Refit the model using this data as an additional predictor. Compare the $R^2$ and the adjusted $R^2$ values:
+
+```{r}
+# Write your solution here.
+```
+
+
+
+
+
+

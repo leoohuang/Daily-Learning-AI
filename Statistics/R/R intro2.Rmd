@@ -1,0 +1,109 @@
+---
+title: "R intro2"
+author: "Tianle Huang"
+date: "2025-12-02"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 表格数据
+向量和因子虽已朝着实用方向迈进，但我们真正需要的是能够处理表格数据（tabular data） —— 而这正是数据框（data frames） 的专长:
+```{r}
+d <- data.frame(name = c('leo', 'tianle', 'huang', 'felix', 'tang'), 
+                age = c(32, 29, 45, 71, 48),
+                employed = c(TRUE, FALSE, TRUE, FALSE, TRUE))
+```
+这样我们就成功创建了一个表格，接下来，我们就可以对表格执行相应的操作了
+##提取
+```{r}
+d$age
+d$employed
+```
+我们还可以接着上一届课所讲的，对表格执行操作
+```{r}
+length(d$name)
+range(d$age)
+```
+如果说想提取年龄大于40岁的人呢：
+```{r}
+d$name[d$age > 40]
+```
+对特定组别进行平均值计算
+```{r}
+mean(d$age[d$employed])
+```
+也有很多针对数据框的特定函数：
+```{r}
+nrow(d)     # 获取数据框的行数
+ncol(d)     # 获取数据库的列数
+colnames(d) # 获取数据库的列名
+```
+对于包含分类数据（categorical data） 的列，我们可以使用 table() 函数统计每个类别的频数
+```{r}
+table(d$employed)
+```
+##tidyverse
+到目前为止，我们所使用的都是 R语言的内置函数，不过在之后我们需要处理大量的数据，需要很多更复杂的操作，所以这里，我们将引入一个新的东西，叫做“tidyverse”，这是一个工具包，你可以使用它来创造更清晰更好维护的代码。
+如何使用呢？
+```{R}
+install.packages('tidyverse') #安装
+library('tidyverse') #导入
+```
+
+##如何从文件当中读取数据？
+
+我们可以像上一讲一样自己来构建数据表，但是这会很麻烦，更常见的情况是，我们会从一些表格文件当中来读取，这时候我们就需要用到tidyverse的 read.csv功能，这个功能可以让你直接读取文件，并且可以把文件存为一个变量，方便后面调用；读取的方法有两种：
+第一种，通过绝对路径进行读取，例如你的文件存放在该目录：
+C:/Users/leohuang/downloads/files
+第二种,直接把文件放在 R Markdown文件的相同目录下，例如你可以在
+C:/Users/leohuang/downloads/files
+该目录新建一个R Markdown文件，然后直接在Markdown文件中进行文件读取就可以了。
+例如我们可以这样读取：
+```{r}
+life <- read_csv('life.csv')
+```
+读取后的对象将会是一个数据库（tibble）
+
+##如何与数据库进行交互？
+读取文件之后，如果要在文件的基础上进行操作，我们通常会使用管道符（%>%)进行文件之间的信息衔接，例如我们可以先打开某个数据表，然后在该数据表当中进行数据筛选，最后进行统计：
+```{r}
+life %>%
+  filter(wealth > 47000 & water >90) %>%
+  count()
+```
+我们也可以使用 select 函数提取特定列
+```{r}
+life %>%
+  select('expectancy','water')
+```
+如果我们把他们放在一起呢？
+```{R}
+life %>%
+  filter(wealth >47000 & water >90) %>%
+  select(water)%>%
+  unique()
+```
+我们也可以使用mutate函数，来增加和修改列，但是要记得，把最后的数据覆盖回去哦
+```{r}
+life <- life %>%
+  mutate(wealth_RMB = 7 * wealth)
+```
+
+## 绘图
+R语言有很多内置的绘图函数，例如：
+```{r}
+plot(life$wealth, life$water)
+```
+内置函数的绘图很快也很简单，但是有时候，我们可能需要回执很多更加多样化以及更复杂的图像，这里我会推荐大家使用ggplot2工具，这个工具包非常强大，也可以更加精确的调整绘制数据的类型和映射条件
+```{R}
+ggplot(life, aes(x = water, y= wealth)) +
+  geom_point()
+```
+
+
+
+
+

@@ -1,0 +1,377 @@
+---
+title: "Introduction to Machine Learning. Regression"
+author: "Rita Almeida"
+date: "Autumn 2025"
+output: pdf_document
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, tidy = FALSE, size = 'footnotesize', fig.align = 'center', cache = FALSE)
+```
+
+```{r message= FALSE}
+library('tidyverse')
+library("gridExtra")
+theme_set(theme_bw())
+set.seed(12383) 
+```
+
+# Prediction
+## Generating data and fitting a linear model
+
+In this section we  fit a linear model to a simulated training data set. 
+The model is then used to make predictions on another simulated data set, the test data set.
+
+We start by generating the training data *dTrain1* consisting of 50 random pairs (x,y), with $x$ restricted to be between -2 and 2.  The relation between x and y is $y= 2+ 3x + e$, where $e$ is normally distributed with mean 0 and variance 4. 
+
+```{r}
+dTrain1 <- tibble(x = runif(50, -2, 2),
+            y = 2 + 3 * x + rnorm(length(x), 0, 4))
+
+```
+
+The data points can be visualized using a scatter plot.
+
+```{r}
+ggplot(dTrain1, aes(x, y)) + 
+  geom_point() + xlim(-3,3)+ ylim(-15,20)
+```
+
+
+Next we fit a linear model $y=\beta_0+\beta_1 x+\epsilon$ to the data, using least squares, with the *lm* command you have used before. We use the *summary* command to look at the results.
+
+```{r}
+m1 <-lm(y ~ x, dTrain1)
+summary(m1)
+```
+
+Finally we plot: the data points; the true relation between $x$ and $y$ in red, dotted line; the population regression line we estimated above in blue, solid line. Note that *b0* and *b1* are the estimated intercept and slope from model *m1*.
+
+
+```{r}
+coefs1 <- coefficients(m1)
+b0 <- coefs1[1] # Intercept
+b1 <- coefs1[2] # Slope
+```
+
+
+```{r}
+ggplot(dTrain1, aes(x, y)) + 
+  geom_point() + xlim(-3,3)+ ylim(-15,20) +
+  geom_abline(intercept = 2, slope = 3, color="red",linetype="dotted")+
+  geom_abline(intercept = b0, slope = b1, color="blue")
+```
+
+## Making predictions for a new data set
+
+When the aim of estimating a function $f(X)$ is prediction, one uses the estimated $\hat{f}$ to predict the values $\hat{y}$. For this example, we start by generating a new data set  with 10 observations, the test data set *dTest1*, in the same way we generated the training set.
+
+
+```{r}
+dTest1 <- tibble(x = runif(10, -2, 2),
+            y = 2 + 3 * x + rnorm(length(x), 0, 4))
+
+```
+
+Next we calculate for each $x$ in *dTest1* the predicted values of $y$ (named *pred* in the code). We use the formula for $f$ with the obtained values for the intercept and slope estimated from the training data. There is a command in R to obtain the predicted values given a model (*predict.lm*, see below) but here we write the formula explicitly for clarity. The predicted values are added has a column to the data frame $dTest1$.
+
+
+```{r}
+dTest1$pred <- b0+b1*dTest1$x
+```
+
+
+The prediction error for each $y$ is simply the difference between the actual $y$ and the predicted value. Below we add a column to *dTest1* containing this prediction error, and another column containing the square of the prediction error. 
+
+```{r}
+dTest1$error <- dTest1$y-dTest1$pred
+dTest1$sqerror <- (dTest1$y-dTest1$pred)^2
+dTest1
+```
+
+The mean of the squared errors is the test **mean squared error** MSE, and can be easily calculated:
+
+```{r}
+mean(dTest1$sqerror)
+```
+
+For comparison we also print the value of the training MSE. Below we also show how to obtain the test MSE is a more succinct way. 
+
+```{r}
+MSE.Train1 = mean(m1$residuals^2)
+MSE.Test1 = mean((dTest1$y - predict.lm(m1, newdata=dTest1)) ^ 2)
+
+print(MSE.Train1)
+print(MSE.Test1)
+
+```
+
+
+
+# Variance of the estimators
+
+Let us draw 500 samples of training data in the same way as before. For each sample we fit a linear model and estimated intercept, slope, training MSE and test MSE. We will not generate new test data. We will keep using the same test data generated before. 
+
+
+```{r}
+for (i in 1:500) {
+    dTrain <- tibble(x = runif(50, -2, 2),
+                  y = 2 + 3 * x + rnorm(length(x), 0, 4))
+    m <-lm(y ~ x, dTrain)
+    coefs <- coefficients(m)
+    est<-tibble(b0=coefs[1], b1=coefs[2],MSE.Train=mean(m$residuals^2),
+                 MSE.Test=mean((dTest1$y - predict.lm(m, newdata=dTest1)) ^ 2))
+    if (i==1) {est1<-est}
+    est1 <- rbind(est1, est )
+}
+```
+
+These 500 samples and model fits can be used to look at the variance in the parameter estimates, and the means of the MSEs.
+
+We can first check the distribution of the quantities we calculated in the 500 samples.
+
+```{r}
+
+p1 <- ggplot(est1, aes(x=b0)) +
+    geom_histogram(binwidth=.2, colour="black", fill="white")
+p2 <- ggplot(est1, aes(x=b1)) +
+    geom_histogram(binwidth=.2, colour="black", fill="white")
+p3 <- ggplot()+ 
+    geom_histogram(aes(x = est1$MSE.Train), alpha = 0.5, binwidth=.8, colour="gray", fill="blue")+
+    geom_histogram(aes(x = est1$MSE.Test), alpha = 0.5, binwidth=.8, colour="gray", fill="pink") + 
+     xlab("MSE train (blue) test (pink)")
+grid.arrange(p1, p2,p3,ncol=3)
+```
+
+And then calculate the variances and means.
+```{r}
+var(est1$b0)
+var(est1$b1)
+
+mean(est1$MSE.Train)
+mean(est1$MSE.Test)
+```
+
+
+
+
+
+## Exercise
+But how does the variance of the estimators and the train and test MSEs change when smaller samples are used to fit the model? 
+To gain intuition on this question repeat the steps just above, but generate training sets with 10 data points. Continue to use the same test data already generated.
+Compare the variances of the estimates and the means of the MSEs obtained using the larger samples (50 data points) and the smaller samples (10 data points). What do you conclude?
+
+
+
+```{r}
+# write your solution here
+```
+
+
+
+## Exercise
+We have just looked at the consequences of using different training set sizes. What happens if one uses different test set sizes?
+Consider a single model that you fitted using a training data set with 50 observations. Use this model to generate predictions for test data sets.
+Start by making predictions for 500 test data sets with 10 observations each. Then make new predictions for 500 test data sets with 50 observations each. 
+Comment on the effect the size of the test data set has on the mean and variance of the test MSE. 
+
+
+```{r}
+# write your solution here
+```
+
+
+# Comparing models
+
+In this section we look at the accuracy of different models. With this aim we start by generating a new training data set *dTrain2* with 20 observations. 
+The data is simulated from a cubic model given by $y=2+3x+2x^2+4x^3$, plus a normally distributed random variable with mean zero and variance 6. Note that apart from $x$ and $y$ we include in *dTrain2* columns for $x^2, x^3,\dots, x^7$ which are needed below.
+
+```{r}
+dTrain2 <- tibble(x = runif(20, -2, 2), x2=x^2, x3=x^3, x4=x^4,
+                  x5=x^5, x6=x^6, x7=x^7,
+                  y = 2 + 3 * x + 2*x2+ 4*x3 + rnorm(length(x), 0, 6))
+head(dTrain2, 5)
+```
+
+Next, the training data set is shown in a scatter plot, together with the true relation between $x$ and $y$ (red dotted curve).
+
+```{r}
+fun2 <- tibble(x = seq(from = -2, to = 2, by = 0.001),
+            y = 2 + 3 * x + 2*x*x+ 4*x*x*x )
+ggplot() +
+geom_point(aes(x = dTrain2$x, y= dTrain2$y)) +
+  geom_line(aes(x = fun2$x, y= fun2$y),color="red", linetype="dotted")
+```
+
+Below we try to estimate the relation between $x$ and $y$ assuming in turn each of the following models: 
+
+linear $y=\beta_0+\beta_1 x$, model *m2.1*
+
+quadratic $y=\beta_0+\beta_1 x + \beta_2 x^2$, model *m2.2*
+
+cubic $y=\beta_0+\beta_1 x + \beta_2 x^2+ \beta_3 x^3$, model *m2.3*
+
+order 7 $y=\beta_0+\beta_1 x + \beta_2 x^2+ \beta_3 x^3+ \beta_4 x^4 +\beta_5 x^5 + \beta_6 x^6 + \beta_7 x^7$, model *m2.7*
+
+We start by the linear model.
+
+```{r}
+m2.1 <-lm(y ~ x , dTrain2)
+summary(m2.1)
+```
+
+Then we generate a test data set *dTest2* with 30 observations.
+
+```{r}
+dTest2 <- tibble(x = runif(30, -2, 2), x2=x^2, x3=x^3, x4=x^4,
+                  x5=x^5, x6=x^6, x7=x^7,
+                  y = 2 + 3 * x + 2*x2+ 4*x3 + rnorm(length(x), 0, 6))
+```
+
+We use the fitted linear model *m2.1* to predict the outcome value $y$ for the test data.
+```{r}
+dTest2$pred1 <- predict.lm(m2.1, newdata=dTest2)
+```
+
+We plot the results for visualization.
+On the left side we show the scatter plot of the training data, the real relation between $x$ and $y$ (red dotted line) and the estimated relation between $x$ and $y$ (blue line).
+On the right side we show the scatter plot of the test data (gray dots), the predicted $\hat{y}$ values for this data (blue dots), the real relation between $x$ and $y$ (red dotted line) and the estimated relation between $x$ and $y$ (blue line). 
+
+```{r}
+xx=seq(from = -2, to = 2, by = 0.001)
+estf <- tibble(x=xx, y1 = predict(m2.1, newdata=list(x=xx)) )
+
+pp1 <- ggplot() +
+geom_point(aes(x = dTrain2$x, y= dTrain2$y),color="black") +
+  geom_line(aes(x = fun2$x, y= fun2$y),color="red", linetype="dotted") +
+  geom_line(aes(x = estf$x, y= estf$y1),color="blue")
+
+pp2 <- ggplot() +
+  geom_point(aes(x = dTest2$x, y= dTest2$y), color="gray")+
+   geom_point(aes(x = dTest2$x, y= dTest2$pred1), color="blue")+
+  geom_line(aes(x = fun2$x, y= fun2$y),color="red", linetype="dotted") +
+  geom_line(aes(x = estf$x, y= estf$y1),color="blue")
+
+grid.arrange(pp1, pp2, ncol=2)
+
+```
+
+
+
+
+We repeat the steps above but assuming a quadratic model.
+
+```{r}
+m2.2 <-lm(y ~ x + x2  , dTrain2)
+```
+
+
+```{r}
+dTest2$pred2 <- predict.lm(m2.2, newdata= dTest2)
+estf$y2 <- predict(m2.2, newdata=list(x=xx,x2=xx^2)) 
+
+pp3 <- ggplot() +
+geom_point(aes(x = dTrain2$x, y= dTrain2$y),color="black") +
+  geom_line(aes(x = fun2$x, y= fun2$y),color="red", linetype="dotted") +
+  geom_line(aes(x = estf$x, y= estf$y2),color="blue")
+
+pp4 <- ggplot() +
+  geom_point(aes(x = dTest2$x, y= dTest2$y), color="gray")+
+  geom_point(aes(x = dTest2$x, y= dTest2$pred2), color="blue")+
+  geom_line(aes(x = fun2$x, y= fun2$y),color="red", linetype="dotted") +
+  geom_line(aes(x = estf$x, y= estf$y2),color="blue")
+
+grid.arrange(pp3, pp4, ncol=2)
+
+```
+
+
+We do the same for the cubic model.
+
+
+
+```{r}
+m2.3 <-lm(y ~ x + x2+ x3 , dTrain2)
+```
+
+
+```{r}
+dTest2$pred3 <- predict.lm(m2.3, newdata=dTest2)
+estf$y3 <- predict(m2.3, newdata=list(x=xx,x2=xx^2,x3=xx^3)) 
+
+pp5 <- ggplot() +
+geom_point(aes(x = dTrain2$x, y= dTrain2$y),color="black") +
+  geom_line(aes(x = fun2$x, y= fun2$y),color="red", linetype="dotted") +
+  geom_line(aes(x = estf$x, y= estf$y3),color="blue")
+
+pp6 <- ggplot() +
+  geom_point(aes(x = dTest2$x, y= dTest2$y), color="gray")+
+  geom_point(aes(x = dTest2$x, y= dTest2$pred3), color="blue")+
+  geom_line(aes(x = fun2$x, y= fun2$y),color="red", linetype="dotted") +
+  geom_line(aes(x = estf$x, y= estf$y3),color="blue")
+
+grid.arrange(pp5, pp6, ncol=2)
+
+```
+
+
+
+And finally for the 7th order polynomial:
+
+```{r}
+m2.7 <-lm(y ~ x + x2 + x3 + x4 + x5 + x6 + x7 , dTrain2)
+```
+
+
+```{r}
+dTest2$pred7 <- predict.lm(m2.7, newdata=dTest2)
+estf$y7 <- predict(m2.7, newdata=list(x=xx,x2=xx^2,x3=xx^3,x4=xx^4,x5=xx^5,x6=xx^6,x7= xx^7)) 
+
+pp7 <- ggplot() +
+geom_point(aes(x = dTrain2$x, y= dTrain2$y),color="black") +
+  geom_line(aes(x = fun2$x, y= fun2$y),color="red", linetype="dotted") +
+  geom_line(aes(x = estf$x, y= estf$y7),color="blue")
+
+pp8 <- ggplot() +
+  geom_point(aes(x = dTest2$x, y= dTest2$y), color="gray")+
+  geom_point(aes(x = dTest2$x, y= dTest2$pred7), color="blue")+
+  geom_line(aes(x = fun2$x, y= fun2$y),color="red", linetype="dotted") +
+  geom_line(aes(x = estf$x, y= estf$y7),color="blue")
+
+grid.arrange(pp7, pp8, ncol=2)
+
+```
+
+
+The accuracy of the models is estimated for the training and the test data sets using the MSE. 
+
+
+```{r echo=FALSE}
+MSE.Train.m2.1 = mean(m2.1$residuals^2)
+MSE.Test.m2.1 = mean((dTest2$y - dTest2$pred1) ^ 2)
+
+MSE.Train.m2.2 = mean(m2.2$residuals^2)
+MSE.Test.m2.2 = mean((dTest2$y - dTest2$pred2) ^ 2)
+
+MSE.Train.m2.3 = mean(m2.3$residuals^2)
+MSE.Test.m2.3 = mean((dTest2$y - dTest2$pred3) ^ 2)
+
+MSE.Train.m2.7 = mean(m2.7$residuals^2)
+MSE.Test.m2.7 = mean((dTest2$y - dTest2$pred7) ^ 2)
+
+cat("For m2.1 the training MSE is", MSE.Train.m2.1, "and the test MSE is", MSE.Test.m2.1 )
+cat("For m2.2 the training MSE is", MSE.Train.m2.2, "and the test MSE is", MSE.Test.m2.2 )
+cat("For m2.3 the training MSE is", MSE.Train.m2.3, "and the test MSE is", MSE.Test.m2.3 )
+cat("For m2.7 the training MSE is", MSE.Train.m2.7, "and the test MSE is", MSE.Test.m2.7 )
+```
+
+As the model complexity increases the fit to the training data gets better (training MSE is reduced). However the test MSE is worse for the most complex model. This is an indication of overfitting. The more complex models are fitting also the random noise in the data and hence generalize less well to the test data set.
+
+## Exercise 
+What would happen if we use more data (say 200 points) for both the training set and the testing set? Repeat the steps above using larger data sets and comment the results found.
+
+```{r}
+# write your solution here
+```

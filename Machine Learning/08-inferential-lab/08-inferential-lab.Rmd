@@ -1,0 +1,302 @@
+---
+author: Marcin Włodarczak
+title: Inferential statistics I
+output: pdf_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r echo=FALSE}
+library('knitr')
+options(width=80)
+opts_chunk$set(tidy=FALSE, size='footnotesize', fig.align='center', out.width='0.8\\textwidth', cache=FALSE)
+``` 
+
+# Preliminaries
+
+We start by loading `tidyverse`:
+```{r message=FALSE}
+library('tidyverse')
+theme_set(theme_bw())
+```
+
+We will also want to read in the file `08-inferential1-utils.R` containing additional functions for this class. These functions hide some of the complexity of R so that you can concentrate on the statistical concepts rather than on getting the code to run. If the following line produces an error, select `Session -> Set Working Directory -> To Source File Location` in RStudio.
+```{r}
+source('08-inferential1-utils.R')
+``` 
+
+Finally, we will initialise the random number generator to make sure we are all getting the same results:
+```{r}
+set.seed(500)
+```
+
+# Sample mean
+
+Let's draw a sample of 100 elements from a normal distribution with $\mu = 20$ and $\sigma = 5$.
+```{r}
+pop_mean <- 20
+pop_sd <- 5
+samp <- rnorm(100, mean = pop_mean, sd = pop_sd)
+``` 
+
+Check its mean and standard deviation:
+```{r}
+mean(samp)
+sd(samp)
+```
+
+Since the samples are drawn randomly, each time we run the code above we will get a somewhat different value.
+
+# Sampling distribution of the mean
+
+Using the population parameters from the previous section, we will now generate the sampling distribution of the mean and plot it. We achieve this by using `replicate` to draw 100,000 (remember that `1e5` is a shorthand for $1 \times 10^5$) samples of 100 elements and calculate the mean of each one.
+```{r}
+n <- 100 # Sample size
+samp_distr <- replicate(1e5, mean(rnorm(n, pop_mean, pop_sd)))
+```
+
+The result is thus a vector of 100,000 means:
+```{r}
+length(samp_distr)
+head(samp_distr)
+```
+
+We can visualise their distribution using a histogram:
+```{r}
+hist(samp_distr, main = 'Sampling distribution of the mean')
+```
+
+Notice that the mean of this distribution is very close to the population mean:
+```{r}
+mean(samp_distr)
+``` 
+
+How about standard deviation?
+```{r}
+sd(samp_distr)
+```
+
+Note that the value above is indeed very close to standard error:
+```{r}
+pop_sd / sqrt(100)
+```
+
+Finally, we will demonstrate that for the sampling distribution of the mean, 95% of data lies in the interval $\mu \pm 1.96 \times \sigma_{\bar{x}}$:
+```{r}
+se <- pop_sd / sqrt(100)
+ci95_lo <- pop_mean - 1.96 * se
+ci95_hi <- pop_mean + 1.96 * se
+sum(samp_distr > ci95_lo & samp_distr < ci95_hi) / length(samp_distr)
+```
+
+## Exercise
+
+Experiment with different values of $\sigma$ and different sample sizes to see how they impact standard error. For instance if you increase sample size by a factor of four, how much will standard error change?
+
+
+# Testing a single mean
+
+Let's draw a sample of 100 data points from our population and check whether it did in fact come from this population ($H_0$):
+```{r}
+samp <- rnorm(100, pop_mean, pop_sd)
+```
+
+The sample mean is:
+```{r}
+mean(samp)
+``` 
+
+It is thus `r round(abs(pop_mean - mean(samp)), 3)` away from the population mean. Let's divide this by standard error:
+```{r}
+se <- pop_sd / sqrt(100)
+z <- (mean(samp) - pop_mean) / se
+``` 
+
+In our case, the value of our test statistic is `r round(z, 3)` and falls inside the 95\% non-rejection region (-1.96, 1.96) so we cannot reject $H_0$.
+
+## Exercise
+
+Repeat the steps above but this time simulate a situation where $H_0$ is false. For instance draw a sample from a population with $\mu = 10, \sigma = 5$ and check whether it came from a population with $\mu = 20, \sigma = 5$.
+
+
+# Confidence intervals
+
+As we know, the 95% CI is equal to $\bar{x} \pm 1.96 \times \sigma_{\bar{x}}$:
+```{r}
+mean(samp) + c(-1.96, 1.96) * se
+```
+
+Of course, because this interval is centered around the sample mean, it will change from sample to sample. 
+
+## Exercise 
+
+Run the code below a couple of times and see how the CI varies between samples. Can you see a CI which does no include the true population mean?
+```{r}
+samp <- rnorm(100, pop_mean, pop_sd)
+mean(samp) + c(-1.96, 1.96) * se
+```
+
+As we saw last time, the idea behind the 95% confidence interval is that on *repeated sampling* it includes the population mean 95% of the time:
+```{r}
+plot_ci_resamp(pop_mean = 5, pop_sd = 2, ci = 0.95)
+```
+
+## Exercise
+
+Run the code above a couple of times and observe how the CIs dance around the mean. Note that the number of CIs which do not include the population mean will not always be 5 due to random sampling.
+
+Next, change the value of `ci` to 0.9 or 0.99 (in order to get 90% and 99% CIs) and see what happens. Do the CIs get wider or narrower? 
+
+
+# One-sample t-test
+
+Now let's assume we do not know the standard deviation of the population the sample came from (which is generally the case). In that scenario, we need to estimate it from sample standard deviation, which equals:
+```{r}
+sd(samp)
+``` 
+
+We plug this value into the calculation of the test statistic
+```{r}
+se_est <- sd(samp) / sqrt(length(samp))
+t_val <- (mean(samp) - pop_mean) / se_est
+``` 
+
+In this case $t$ equals `r round(t_val, 3)`. The number of degrees of freedom is `r length(samp)` - 1 = `r length(samp) - 1`. Let's get the critical values (you do not really need to try to remember how to do this in R):
+```{r}
+crit95 <- qt(c(0.025, 0.975), df = length(samp) - 1)
+``` 
+
+Incidentally, the critical values we calculated are very similar to the critical values for the normal distribution. In fact, with increasing number of degrees of freedom, critical values for the two distributions converge
+```{r}
+plot_t_crit(0.95)
+``` 
+
+You can get the associated p-value like this (you absolutely do not need to remember how to do it, either):
+```{r}
+2 * pt(-abs(t_val), df = length(samp) - 1)
+``` 
+
+In reality we would not calculate all this by hand. Instead we would use the `t.test` function to do all the work for us:
+```{r}
+t.test(samp, mu = 20)
+```
+
+As you can see, R also calculates the 95% confidence interval for us. Of course we could also obtain it ourselves (remember that the confidence interval $\bar{x} \pm SE_{\bar{x}} \times t_{crit}$):
+```{r}
+mean(samp) + se_est * crit95
+```
+
+Note that in this case the 95% confidence interval includes the population mean.
+
+## Exercise
+
+As an exercise, repeat the procedure in a scenario when $H_0$ is false. Does the 95% confidence interval include the population mean in that case?
+
+```{r}
+# Write your solution here.
+```
+
+# Two-sample t-test
+
+We can also use the t-test to test differences between two samples (two-sample t-test). The logic in this case is very similar -- assuming that the two samples come from populations with equal means ($H_0$), what is the likelihood of observing samples whose means differ at least as much as in the two samples in question. For a more in-depth discussion of the two-sample t-test, see the additional material below.
+
+We can carry out a two-sample t-test with the `t.test` function if we supply it with two vectors:
+```{r}
+x1 <- rnorm(50, 0, 1)
+x2 <- rnorm(50, 4, 1)
+t.test(x1, x2)
+```
+
+Note that in the example above the 95% confidence interval does not include 0.
+
+If we put the data in a date frame (or a tibble), we can also use the familiar formula syntax:
+```{r}
+d <- tibble(x = c(x1, x2),
+            group = rep(c('A', 'B'), each = 50))
+t.test(x ~ group, d)
+```
+
+## Exercise
+
+Repeat the analysis above in a scenario when $H_0$ is true. Does the 95% confidence interval include 0 in this case?
+
+```{r}
+# Write your solution here.
+```
+
+## Exercise
+
+Use the `ratings` data set from the `langaugeR` package and compare mean size ratings for `animal` and `plant` words.
+```{r}
+library('languageR')
+data(ratings)
+
+ratings %>%
+    select(Word, Class, meanSizeRating) %>%
+    head()
+
+                                        # Write your solution here.
+```
+
+Next, fit a corresponding regression model and inspect its summary. Look in particular at the `Coefficients` section. Can you see any parallels with the `t.test`?
+```{r}
+# Write your solution here.
+```
+
+# Bonus: Two-sample t-test explained
+
+The two-sample $t$-test lets us to test whether two samples were drawn from populations with the same means ($H_0$). Let's start by drawing two samples from distributions with different means (i.e. where $H_0$ is false).
+```{r}
+samp1 <- rnorm(150, 25, 5)
+samp2 <- rnorm(100, 20, 5)
+mean(samp1)
+mean(samp2)
+``` 
+
+In this case, our sampling distribution is of the *difference of sample means*:
+```{r}
+samp_distr_diff_mean <- replicate(
+    1e5, mean(rnorm(150, 20, 5)) - mean(rnorm(100, 30, 5)))
+hist(samp_distr_diff_mean, main = 'Sampling distribution of the difference in means')
+```
+
+Take a minute to make sure the mean of this distribution is equal to the difference between the population means. The standard standard deviation of this distribution is related to variances of both populations and is equal to:
+$$\sqrt{\frac{\sigma_1^2}{n_1} + \frac{\sigma_2^2}{n_2}}$$
+
+Since we do not know the value of $\sigma$, we need to estimate it from standard deviations of the samples. Assuming that the two two populations have the same $\sigma^2$ (which they do in this case), its unbiased estimate is given as:
+$$s^2 = \frac{(n_1 - 1) s_1^2 + (n_2 - 1) s_2^2}{n_1 + n_2 - 2}$$
+The value above is called *pooled variance* since it pools (or combines) the standard deviations of the individual samples. Numerically, it is calculated as a weighted sum of the two variances. We can then use the estimated value and plug it into the formula for the standard error for the difference between two means:
+$$SE_{\bar{x}_1 - \bar{x}_2} = \sqrt{\frac{s^2}{n_1} + \frac{s^2}{n_2}}$$
+
+Are these two means different in this case? We start by calculating pooled variance and standard error:
+```{r}
+n1 <- length(samp1)
+n2 <- length(samp2)
+var_pooled <- ((n1 - 1) * var(samp1) + (n2 - 1) * var(samp2)) / (n1 + n2 - 2)
+st_err_diff <- sqrt(var_pooled / n1 + var_pooled / n2)
+```
+
+Again, note that the value of standard error calculated above (`r round(st_err_diff, 3)`) is a pretty good estimate of standard deviation of our simulated sampling distribution (`r round(sd(samp_distr_diff_mean), 3)`).
+
+Now we are ready to calculate the t-value, the critical values and the p-value:
+```{r}
+t_val <- (mean(samp1) - mean(samp2)) / st_err_diff
+df <- n1 + n2 - 2
+crit95 <- qt(c(0.025, 0.975), df)
+p_val <- 2 * pt(-abs(t_val), df, lower.tail = TRUE)
+```
+
+The value of the test statistic equals `r round(t_val, 3)`, the 95% critical values with `r df` degrees of freedom correspond to (`r round(crit95[1], 3)`, `r round(crit95[2], 3)`), and p-value is `r p_val`.
+
+Of course, we can ask R to give us the answer:
+```{r}
+t.test(samp1, samp2, var.equal = TRUE)
+```
+
+By default, when R carries out a t-test, it applies Welch's correction, which is necessary when variances of the two populations are not equal. Since in real life we almost never know population variances, this is what we want!
+
+```{r}
+t.test(samp1, samp2)
+```
+
+As an exercise, draw two samples from the same population and repeat the procedure above.

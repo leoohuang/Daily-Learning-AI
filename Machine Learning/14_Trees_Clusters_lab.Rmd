@@ -1,0 +1,468 @@
+---
+title: "Lab 14 - Trees and clusters"
+author: "Rita Almeida"
+date: "Autumn 2025"
+output: pdf_document
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, tidy = FALSE, size = 'footnotesize', 
+                      fig.align = 'center', cache = FALSE)
+```
+
+For this lab we use the packages *tree* and *randomForest*.
+If you do not have these packages installed, do it using the commands install.packages("tree") and install.packages("randomForest").
+
+
+```{r message= FALSE}
+library('tidyverse')
+library(tree)
+library(randomForest)
+theme_set(theme_bw())
+```
+
+For the first part of the lab we are using a subset of the data about adults learning Dutch as a second language, which we used in the lab 12. This subset contains 10 individuals per *L1* language, randomly selected from the original data.
+Below you have a very short description of some of the variables.
+
+L1: First language
+
+C: Country of birth
+
+L2: The second best additional language besides Dutch. If no second language the variable has the value *Monolingual*
+
+L1L2: Variables L1 and L2 together
+
+AaA: Age at arrival in the Netherlands
+
+LoR: Length of residence in the Netherlands
+
+Edu.day: Level of education (1 to 4)
+
+Family: Language family of the first language
+
+Enroll: Proportion of school-aged youth enrolled in secondary education in the country of origin
+
+Speaking: Speaking proficiency test score on the State Examination of Dutch as a Second Language
+
+morph:  Morphological dissimilarity from L1 to the target language
+
+lex: Lexical dissimilarity from L1 to the target language
+
+new_feat: Phonological dissimilarity (in terms of new features) from L1 to the target language
+
+new_sounds: Phonological dissimilarity (in terms of new sounds) from L1 to the target language
+
+NotMono: True if an individual is not monolingual.
+
+We start by loading the data set.
+
+```{r}
+stex2 <- read_csv('stex-2.csv')
+```
+
+
+# Classification Trees
+
+Previously we have used the variable *Speaking*, which is the score on a speaking proficiency test, as outcome variable. 
+In this lab we want to first address a classification problem, so we start by creating a new output variable from the original *Speaking* variable.
+We create a variable which takes the value "High" for all students that had a score in the upper 25% of the results, and takes the value "Low" for all other students.
+
+```{r}
+stex2$Speak.H = factor(ifelse ( stex2$Speaking < quantile(stex2$Speaking,0.75) 
+                                ,"Low" ,"High"))
+```
+
+Then we use the *tree()* function to fit a classification tree using as predictors the following variables: *AaA*, *LoR*, *Edu.day*, *Enroll*, *morph*, *lex*, *new_feat*, *new_sounds* and *NotMono*. The syntax is very similar to that of the *lm()* models we have previously used. 
+
+```{r}
+tree.Speaking.Class = tree( Speak.H ~  AaA + LoR + Edu.day  + Enroll +morph +
+                              lex + new_feat + new_sounds + factor(NotMono), 
+                            data = stex2)
+```
+
+
+The command *summary()* shows information about the results. You can see that the classifier has an error rate of 22%. The tree has 9 terminal nodes and the variables actually used are *morph*, *AaA*, *Enroll* and *new_sounds*.
+
+```{r}
+summary(tree.Speaking.Class)
+```
+
+We can also display the results in a plot using the *plot()* function. The *text()* function is used to display the node labels.
+
+```{r}
+plot(tree.Speaking.Class)
+text(tree.Speaking.Class, pretty=0)
+```
+
+You can see that the most important variable for classification, according to this fit, is *morph*. 
+You can also see that individuals whose first language has low morphological dissimilarity to the target language (*morph*) and who arrived at lower age to the Netherlands, have higher scores on the speaking exam.  
+
+If one just types the name of the tree object, one gets information, for each branch, about the split criterion, the number of observations, and the fraction of observations that have each branch. 
+Branches that lead to terminal nodes are indicated with an *.
+
+```{r}
+tree.Speaking.Class
+```
+
+
+## Estimating the error rate on test data
+
+To evaluate the performance of the model in new data, we start by dividing the data set into a training set and a test set. We will use 2/3 of the data to train the model and 1/3 to test.
+
+```{r}
+set.seed(2)
+index.train1 = sample (nrow(stex2), round(nrow(stex2)*2/3))
+stex2.train1 <-stex2[index.train1, ]
+stex2.test1 <-stex2[-index.train1, ]
+```
+
+Then we train the model on the training set.
+
+```{r}
+tree.Speaking.Class.train1 = tree( Speak.H ~  AaA + LoR + Edu.day  + Enroll +morph +
+                              lex + new_feat + new_sounds + factor(NotMono), 
+                              data= stex2.train1)
+```
+
+We can see the results and display them. You can see that on this training data set, we got a tree with 15 terminal branches and a error rate of 20%, on the training data.
+
+```{r}
+summary(tree.Speaking.Class.train1)
+
+plot(tree.Speaking.Class.train1)
+text(tree.Speaking.Class.train1, pretty=0)
+```
+
+
+Then we use function *predict()* with the argument *type="class"*, to get the labels of the predicted classes as output. 
+
+
+```{r}
+tree.Speaking.Class.pred1 = predict(tree.Speaking.Class.train1, stex2.test1, 
+                                    type="class")
+```
+
+Finally we can print the confusion table and the test error rate.
+```{r}
+table(tree.Speaking.Class.pred1, stex2.test1$Speak.H)
+mean(tree.Speaking.Class.pred1!=stex2.test1$Speak.H)
+```
+
+We see that the error rate on the test data is 29%.
+
+
+## Exercise
+Create different sets of training and test data. Train models on each of the training sets. Then use the models for prediction in the corresponding test sets. Comment your results in terms of the trees obtained, the number of terminal nodes and the error rates on the test data sets.
+
+```{r}
+# write your solution here 
+```
+
+
+## Tree pruning
+
+Next, we try tree pruning to see if we can get better results.
+The function *cv.tree* can be used to find the optimal level of the tree complexity, using cross-validation. The argument *FUN=prune.misclass* is used so that the cross-validation error rate guides the pruning of the tree. 
+
+
+```{r}
+set.seed(7)
+cv.tree.Speaking.Class.train1 = cv.tree(tree.Speaking.Class.train1, FUN=prune.misclass)
+```
+
+The result of *cv.tree()* shows the following variables:
+
+size - containing the number of terminal nodes of each tree considered
+
+dev - containing the cross-validates error, according to the argument *FUN*
+
+k - a parameter controlling the trade-oﬀ between trees' complexity and their fit to the training data
+
+```{r}
+cv.tree.Speaking.Class.train1
+```
+
+The output shows that the tree with 3 nodes has the lowest cross-validation error (85).
+Using this knowledge, we can apply the function *prune.misclass()* to the tree we have obtained (*tree.Speaking.Class.train1*) to obtain the 3 nodes tree. 
+
+```{r}
+prune.tree.Speaking = prune.misclass(tree.Speaking.Class.train1, best =3)
+```
+
+We can plot the resulting model, to see the pruned tree.
+```{r}
+plot ( prune.tree.Speaking)
+text ( prune.tree.Speaking, pretty =0)
+```
+
+Finally we use the pruned tree to make predictions on the test data and to calculate the confusion matrix and the error rate. 
+
+```{r}
+tree.Speaking.Class.pred2 = predict(prune.tree.Speaking, stex2.test1, type="class")
+
+table(tree.Speaking.Class.pred2, stex2.test1$Speak.H)
+mean(tree.Speaking.Class.pred2!=stex2.test1$Speak.H)
+```
+
+The test error rate is 22%. So, not only the pruned model is easier to interpret, as the error test rate decreased (it was 29% before pruning).
+
+
+## Regression trees
+
+In this lab we use the same data set to fit a regression tree. For the regression problem, we use the original quantitative variable *Speaking* as outcome variable. The procedure is very similar to that of fitting a classification tree.
+We use the same predictors that we used for the classification tree models.
+
+We start by creating a new training and test data sets. 
+
+```{r}
+set.seed(90)
+index.train2 = sample (nrow(stex2), round(nrow(stex2)/2))
+stex2.train2 <-stex2[index.train2, ]
+stex2.test2 <-stex2[-index.train2, ]
+```
+
+
+Then we fit a regression tree to the training data set
+```{r}
+tree.Speaking = tree( Speaking ~ AaA + LoR + Edu.day  + Enroll +morph +
+                              lex + new_feat + new_sounds + factor(NotMono), 
+                              data= stex2.train2)
+```
+
+Next we display some information about the model fitted. One can see that the fitted tree has 12 terminal nodes, and what variables were actually used in the model.
+
+```{r}
+summary(tree.Speaking)
+```
+
+One can also use the *plot()* function to visualize the model, as before.
+```{r}
+plot(tree.Speaking)
+text(tree.Speaking, pretty=0)
+```
+
+Next, we can use the function *cv.tree* to check if pruning the tree can improve performance.
+
+```{r}
+set.seed(60)
+cv.tree.Speaking = cv.tree(tree.Speaking)
+cv.tree.Speaking
+```
+
+In a similar way to what was done before, we see that the tree with 7 nodes is selected by cross-validation. Note that now, for a regression tree, *dev* shows the total deviance of each tree, instead of the number of errors.
+
+We can prune the tree using the *prune.tree* command with *best=7*.
+```{r}
+prune.Rtree.Speaking = prune.tree(tree.Speaking, best=7)
+```
+
+We can visualize the pruned tree and show some information about it. 
+```{r}
+plot(prune.Rtree.Speaking)
+text(prune.Rtree.Speaking, pretty=0)
+summary(prune.Rtree.Speaking)
+```
+
+Finally, we can apply the pruned tree to the test data set and calculate the test MSE.
+```{r}
+tree.Speaking.pred1 = predict(prune.Rtree.Speaking, stex2.test2)
+mean((tree.Speaking.pred1-stex2.test2$Speaking)^2)
+```
+
+The square root of the MSE is approximately 32, which means that the predictions will be within around 32 points from the true scores in the exam. 
+
+## Bagging and random forests
+
+Now we will use the function *randomForest()* to apply bagging and random forests to the same data set. 
+Note that bagging is a special case of a random forest with *m* equal to the number of variables *p*.
+
+We start by growing a random forest using the training data set *stex2.train2* and using the same variables as above.
+To grow a random forest we will use *$\sqrt p$* variables. This is the default for regression trees and in this case is 3, so we set the argument *mtry=3*. 
+
+```{r}
+set.seed(70)
+rF.Speaking=randomForest(Speaking~ AaA + LoR + Edu.day  + Enroll +morph +
+                              lex + new_feat + new_sounds + NotMono, 
+                              data= stex2.train2,
+                              mtry=3, importance=TRUE)
+```
+
+We can see some information about the process below. We see that the process used 500 and three variables at each split. 
+```{r}
+rF.Speaking
+```
+
+Finally we can make predictions for the test data and calculate the MSE. We see there was an improvement in relation to the pruned tree above. 
+
+```{r}
+rF.Speaking.pred1 = predict (rF.Speaking , newdata = stex2.test2)
+mean((rF.Speaking.pred1-stex2.test2$Speaking)^2)
+```
+
+The function *importance()* can be used to view the importance of each variable.
+Two measures are shown. The first is based on the mean increase of MSE
+when a given variable is not used. The second is a measure of average increase in node purity that results from 
+using that variable.
+The function shows that the most important variables are *morph*, *Enroll* and *lex*, what is maybe not surprising 
+given the trees we have plotted before. 
+
+```{r}
+importance(rF.Speaking)
+```
+
+# Exercise
+
+Use the function *randomForest()* with *m* set to the total number of predictors (argument *mtry=9*) to perform bagging. 
+You can use the same variables and training data as before. 
+Comment the results. 
+
+```{r}
+# write your solution here
+```
+
+
+
+# Clustering
+
+For this part of the lab we generate a data set *x* in two dimensions with 2 clusters of 25 observations each.  
+
+```{r}
+set.seed(2)
+x <- matrix(rnorm(50*2),ncol=2)
+x[1:25,1 ] <- x[1:25,1 ]+3
+x[1:25, 2] <- x[1:25,2 ]-4
+
+plot(x)
+```
+
+## K-means clustering
+
+We start by performing k-means clustering, using  the command *kmeans()*. To apply the *kmeans* algorithm we have to set the number of clusters. We start with k=2. 
+The value of *nstart* determines how many times the algorithm will be run using initial different cluster assignments. 
+
+```{r}
+km.out2 <- kmeans(x,2,nstart=20)
+km.out2
+```
+
+Observing the output you see that the algorithm divided the data into the 2 correct clusters.
+
+The observations can be plotted using colors to distinguish the clusters.
+
+```{r}
+plot(x,col=km.out2$cluster, main="K-means clustering with k=2",pch=20)
+```
+
+## Exercise 
+Perform *k-means* clustering, but specifying the number of clusters to be *k=3*. Comment the results.
+
+
+```{r}
+# write your solution here
+```
+
+
+## Avoiding local optima
+
+Running the algorithm with a large number of initial assignments minimizes the risk of convergence to a sub-optimal solution.
+To illustrate this point we can run the algorithm with k=3 and nstart=1. 
+We can observe the value of the total within-cluster sum of squares which is saved in *tot.withinss*. 
+
+```{r}
+set.seed(4)
+km.out3a <- kmeans(x,3,nstart=1)
+km.out3a$tot.withinss
+plot(x,col=km.out3a$cluster, main="K-means clustering with k=3",pch=20)
+```
+
+Now we can repeat the procedure several times. One can see the results change as does the sum of squares.
+
+```{r}
+km.out3a <- kmeans(x,3,nstart=1)
+km.out3a$tot.withinss
+plot(x,col=km.out3a$cluster, main="K-means clustering with k=3",pch=20)
+```
+
+## Exercise 
+Now repeat the procedure again but using *nstart=20*. Comment on the results obtained.
+
+```{r}
+# write your solution here
+```
+
+
+## Deciding the number of clusters
+
+Many ways have been proposed for deciding on the number of clusters one should use to divide the data.
+Here we will use a very simple method. We will compare the total within-cluster sum of squares for 1 to 7 clusters. 
+
+```{r}
+wss <- vector()
+for (i in 1:7) {
+  km.aux <- kmeans(x,i,nstart=20)
+  wss[i] <- km.aux$tot.withinss
+}
+
+plot(1:7, wss, type="o", xlab="Number of Clusters",
+     ylab="Within groups sum of squares")
+
+```
+
+Observing the results one sees that there is a large decrease of the within group sum of squares when one goes from 1 to 2 clusters. 
+This indicates that 2 clusters are probably appropriate to describe the data. 
+
+
+## Hierarchical clustering
+
+We use the function *hclust()* to apply hierarchical clustering to the same simulated data set.
+We use euclidean distance. We start by using complete linkage. For this measure all dissimilarities between observations in two clusters are computed and then the largest dissimilarity is considered.
+
+```{r}
+hc.complete <- hclust(dist(x), method="complete")
+```
+
+
+```{r}
+plot(hc.complete,main="Complete linkage",cex=0.6)
+```
+
+Then we try average linkage. For this measure all dissimilarities between observations in two clusters are computed and then the average dissimilarity is considered.
+```{r}
+hc.average <- hclust(dist(x), method="average")
+plot(hc.average,main="Average linkage",cex=0.6)
+```
+
+Finally we try single linkage. For this measure all dissimilarities between observations in two clusters are computed and then the smallest is considered.
+```{r}
+hc.single <- hclust(dist(x), method="single")
+plot(hc.single,main="Single linkage",cex=0.6)
+```
+
+## Cutting the dendograms
+
+For a given cut of the dendogram one gets the associated labels for the observations. 
+We start by cutting the dendograms for the complete linkage to obtain 2 clusters and visualize the result.
+
+```{r}
+cut2.complete<-cutree(hc.complete,2)
+plot(x,col=cut2.complete, main="Hierarchical clustering, complete linkage",pch=20)
+```
+
+We do the same for the dendogram obtained from average linkage.
+```{r}
+cut2.average<-cutree(hc.average,2)
+plot(x,col=cut2.average, main="Hierarchical clustering, average linkage",pch=20)
+```
+
+Finally we repeat for the dendogram with single linkage. 
+```{r}
+cut2.single<-cutree(hc.single,2)
+plot(x,col=cut2.single, main="Hierarchical clustering, single linkage",pch=20)
+
+```
+
+This example illustrates the fact that the average and complete link tend to give more balanced clusters. 
+Single linkage can result in extended clusters to which observations are fused one at a time. Single linkage does not perform so well on this data.
+

@@ -1,0 +1,698 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  Calculator, 
+  Music, 
+  Activity,
+  BookOpen, 
+  CheckCircle, 
+  XCircle, 
+  RefreshCw, 
+  Volume2
+} from 'lucide-react';
+
+// --- Helper Components ---
+
+// 用于显示分数的组件
+const Fraction = ({ num, den }) => (
+  <span className="inline-flex flex-col align-middle text-center mx-1 font-serif">
+    <span className="border-b border-gray-800 pb-0.5 px-1">{num}</span>
+    <span className="pt-0.5 px-1">{den}</span>
+  </span>
+);
+
+// --- Data Structure ---
+
+const THEMES = {
+  acoustics: {
+    id: 'acoustics',
+    title: '声学 (Acoustics)',
+    icon: <Volume2 className="w-5 h-5" />,
+    color: 'bg-blue-500',
+    lightColor: 'bg-blue-50',
+    formulas: [
+      {
+        id: 'spl',
+        name: '求声压级 (SPL)',
+        display: (
+          <span>
+            SPL = 20 × log<sub>10</sub>
+            <span className="text-xl mx-1">(</span>
+            <Fraction num="P" den={<span>P<sub>ref</sub></span>} />
+            <span className="text-xl mx-1">)</span>
+          </span>
+        ),
+        desc: '根据声压计算分贝值。P 是测量声压，P_ref 是参考声压 (20 μPa)。',
+        inputs: [
+          { id: 'p', label: '声压 P (Pa)', min: 0.00002, max: 200, step: 0.00001, default: 0.02 },
+          { id: 'pref', label: '参考声压 P_ref', min: 0.00002, max: 0.00002, step: 0, default: 0.00002, locked: true }
+        ],
+        calc: (v) => 20 * Math.log10(v.p / v.pref),
+        unit: 'dB',
+        vizType: 'db_result' // 结果是 dB
+      },
+      {
+        id: 'p_calc',
+        name: '求声压 (Pressure)',
+        display: (
+          <span>
+            P = P<sub>ref</sub> × 10
+            <sup>
+              <Fraction num="SPL" den="20" />
+            </sup>
+          </span>
+        ),
+        desc: '已知声压级 (dB) 反推物理声压 (Pa)。',
+        inputs: [
+          { id: 'spl', label: '声压级 (dB)', min: 0, max: 140, step: 1, default: 60 },
+          { id: 'pref', label: '参考声压 P_ref', min: 0.00002, max: 0.00002, step: 0, default: 0.00002, locked: true }
+        ],
+        calc: (v) => v.pref * Math.pow(10, v.spl / 20),
+        unit: 'Pa',
+        vizType: 'db_input' // 输入是 dB
+      },
+      {
+        id: 'sil',
+        name: '求声强级 (SIL)',
+        display: (
+          <span>
+            SIL = 10 × log<sub>10</sub>
+            <span className="text-xl mx-1">(</span>
+            <Fraction num="I" den={<span>I<sub>ref</sub></span>} />
+            <span className="text-xl mx-1">)</span>
+          </span>
+        ),
+        desc: '根据声强计算分贝值。注意系数是 10。',
+        inputs: [
+          { id: 'i', label: '声强 I (W/m²)', min: 1e-12, max: 10, step: 1e-12, default: 1e-6 },
+          { id: 'iref', label: '参考声强 I_ref', min: 1e-12, max: 1e-12, step: 0, default: 1e-12, locked: true }
+        ],
+        calc: (v) => 10 * Math.log10(v.i / v.iref),
+        unit: 'dB',
+        vizType: 'db_result'
+      },
+      {
+        id: 'i_calc',
+        name: '求声强 (Intensity)',
+        display: (
+          <span>
+            I = I<sub>ref</sub> × 10
+            <sup>
+              <Fraction num="SIL" den="10" />
+            </sup>
+          </span>
+        ),
+        desc: '已知声强级 (dB) 反推物理声强。',
+        inputs: [
+          { id: 'sil', label: '声强级 (dB)', min: 0, max: 140, step: 1, default: 60 },
+          { id: 'iref', label: '参考声强 I_ref', min: 1e-12, max: 1e-12, step: 0, default: 1e-12, locked: true }
+        ],
+        calc: (v) => v.iref * Math.pow(10, v.sil / 10),
+        unit: 'W/m²',
+        vizType: 'db_input'
+      }
+    ]
+  },
+  pitch: {
+    id: 'pitch',
+    title: '音高与频率 (Pitch)',
+    icon: <Music className="w-5 h-5" />,
+    color: 'bg-purple-500',
+    lightColor: 'bg-purple-50',
+    formulas: [
+      {
+        id: 'semitones',
+        name: '求半音差 (Semitones)',
+        display: (
+          <span>
+            n = 12 × log<sub>2</sub>
+            <span className="text-xl mx-1">(</span>
+            <Fraction num={<span>f<sub>target</sub></span>} den={<span>f<sub>ref</sub></span>} />
+            <span className="text-xl mx-1">)</span>
+          </span>
+        ),
+        desc: '计算目标频率相对于参考频率相差多少个半音。',
+        inputs: [
+          { id: 'f', label: '目标频率 (Hz)', min: 20, max: 20000, step: 1, default: 880 },
+          { id: 'fref', label: '参考频率 (Hz)', min: 20, max: 20000, step: 1, default: 440 }
+        ],
+        calc: (v) => 12 * Math.log2(v.f / v.fref),
+        unit: 'semitones',
+        vizType: 'pitch_result'
+      },
+      {
+        id: 'freq_calc',
+        name: '求频率 (Hertz)',
+        display: (
+          <span>
+            f = f<sub>ref</sub> × 2
+            <sup>
+              <Fraction num="n" den="12" />
+            </sup>
+          </span>
+        ),
+        desc: '已知半音差 n，计算目标频率。',
+        inputs: [
+          { id: 'n', label: '半音差 n', min: -48, max: 48, step: 1, default: 12 },
+          { id: 'fref', label: '参考频率 (Hz)', min: 20, max: 20000, step: 1, default: 440 }
+        ],
+        calc: (v) => v.fref * Math.pow(2, v.n / 12),
+        unit: 'Hz',
+        vizType: 'pitch_input'
+      }
+    ]
+  },
+  digital: {
+    id: 'digital',
+    title: '数字音频 (Digital)',
+    icon: <Activity className="w-5 h-5" />,
+    color: 'bg-emerald-500',
+    lightColor: 'bg-emerald-50',
+    formulas: [
+      {
+        id: 'samples',
+        name: '求采样数 (#Samples)',
+        display: (
+          <span>#Samples = Duration × SR</span>
+        ),
+        desc: '计算音频片段的总采样点数。',
+        inputs: [
+          { id: 'dur', label: '时长 (秒)', min: 0.1, max: 10, step: 0.1, default: 1 },
+          { id: 'sr', label: '采样率 (Hz)', min: 100, max: 96000, step: 100, default: 44100 }
+        ],
+        calc: (v) => v.dur * v.sr,
+        unit: 'samples',
+        vizType: 'digital_normal'
+      },
+      {
+        id: 'duration',
+        name: '求时长 (Duration)',
+        display: (
+          <span>
+            Duration = <Fraction num="#Samples" den="SR" />
+          </span>
+        ),
+        desc: '根据采样数和采样率计算时间。',
+        inputs: [
+          { id: 'samps', label: '采样数', min: 100, max: 1000000, step: 100, default: 44100 },
+          { id: 'sr', label: '采样率 (Hz)', min: 100, max: 96000, step: 100, default: 44100 }
+        ],
+        calc: (v) => v.samps / v.sr,
+        unit: 's',
+        vizType: 'digital_normal'
+      },
+      {
+        id: 'sr_calc',
+        name: '求采样率 (SR)',
+        display: (
+          <span>
+            SR = <Fraction num="#Samples" den="Duration" />
+          </span>
+        ),
+        desc: '已知总采样数和时长，计算采样率。',
+        inputs: [
+          { id: 'samps', label: '采样数', min: 100, max: 1000000, step: 100, default: 88200 },
+          { id: 'dur', label: '时长 (秒)', min: 0.1, max: 10, step: 0.1, default: 2 }
+        ],
+        calc: (v) => v.samps / v.dur,
+        unit: 'Hz',
+        vizType: 'digital_sr_result'
+      }
+    ]
+  }
+};
+
+// --- Quiz Logic ---
+
+const generateQuiz = (themeId) => {
+  const theme = THEMES[themeId];
+  const formula = theme.formulas[Math.floor(Math.random() * theme.formulas.length)];
+  
+  let qText = '', ans = 0, unit = formula.unit;
+  const rand = (min, max) => Math.random() * (max - min) + min;
+  const randInt = (min, max) => Math.floor(rand(min, max));
+
+  switch(formula.id) {
+    case 'spl': {
+      const p = Math.pow(10, rand(-4, 2)); // Random power of 10 pressure
+      qText = `测得声压 P = ${p.toExponential(2)} Pa，参考声压 P_ref = 2×10^-5 Pa，求 SPL (dB)。`;
+      ans = 20 * Math.log10(p / 0.00002);
+      break;
+    }
+    case 'p_calc': {
+      const spl = randInt(40, 100);
+      qText = `已知 SPL = ${spl} dB，参考声压 P_ref = 2×10^-5 Pa，求声压 P (Pa)。`;
+      ans = 0.00002 * Math.pow(10, spl / 20);
+      break;
+    }
+    case 'sil': {
+      const i = Math.pow(10, rand(-10, -2));
+      qText = `测得声强 I = ${i.toExponential(2)} W/m²，参考声强 I_ref = 10^-12 W/m²，求 SIL (dB)。`;
+      ans = 10 * Math.log10(i / 1e-12);
+      break;
+    }
+    case 'i_calc': {
+      const sil = randInt(40, 100);
+      qText = `已知 SIL = ${sil} dB，参考声强 I_ref = 10^-12 W/m²，求声强 I (W/m²)。`;
+      ans = 1e-12 * Math.pow(10, sil / 10);
+      break;
+    }
+    case 'semitones': {
+      const f1 = 440;
+      const n = randInt(-12, 12);
+      const f2 = f1 * Math.pow(2, n/12);
+      qText = `参考频率 440Hz，目标频率 ${f2.toFixed(1)}Hz，相差多少半音？`;
+      ans = n;
+      break;
+    }
+    case 'freq_calc': {
+      const n = randInt(-12, 12);
+      qText = `基准频率 440Hz，高 ${n} 个半音的频率是多少 Hz？`;
+      ans = 440 * Math.pow(2, n/12);
+      break;
+    }
+    case 'samples': {
+      const dur = randInt(1, 5);
+      const sr = 48000;
+      qText = `时长 ${dur} 秒，采样率 48000Hz，共有多少个采样点？`;
+      ans = dur * sr;
+      break;
+    }
+    case 'duration': {
+      const samps = 48000 * randInt(1, 4);
+      const sr = 48000;
+      qText = `采样数 ${samps}，采样率 48000Hz，时长是多少秒？`;
+      ans = samps / sr;
+      break;
+    }
+    case 'sr_calc': {
+      const dur = 2;
+      const sr = 44100;
+      const samps = dur * sr;
+      qText = `2秒音频包含 ${samps} 个采样点，采样率是多少？`;
+      ans = sr;
+      break;
+    }
+    default: ans = 0;
+  }
+
+  // Generate Options
+  const options = new Set();
+  options.add(parseFloat(ans.toPrecision(3)));
+  while(options.size < 4) {
+    let wrong = ans * rand(0.5, 1.5);
+    if(Math.abs(wrong - ans) > ans * 0.05) options.add(parseFloat(wrong.toPrecision(3)));
+  }
+
+  return { question: qText, options: Array.from(options).sort((a,b)=>a-b), answer: parseFloat(ans.toPrecision(3)), unit };
+};
+
+// --- Components ---
+
+const Visualizer = ({ themeId, formulaId, vizType, result, inputs }) => {
+  // 1. Acoustics Visualization (Gauge)
+  if (themeId === 'acoustics') {
+    // Determine what dB value to show
+    let displayDB = 0;
+    if (vizType === 'db_result') displayDB = result;
+    else if (vizType === 'db_input') displayDB = inputs.spl || inputs.sil || 0;
+
+    const percentage = Math.min(Math.max((displayDB / 140) * 100, 0), 100);
+    const colorClass = percentage < 60 ? 'bg-green-500' : percentage < 85 ? 'bg-yellow-500' : 'bg-red-500';
+
+    return (
+      <div className="mt-6 p-4 bg-gray-900 rounded-lg text-white">
+        <div className="flex justify-between mb-2 text-xs text-gray-400">
+          <span>0 dB (听阈)</span>
+          <span>140 dB (痛阈)</span>
+        </div>
+        <div className="h-6 w-full bg-gray-700 rounded-full overflow-hidden relative mb-4">
+          <div className={`h-full transition-all duration-500 ${colorClass}`} style={{ width: `${percentage}%` }} />
+          {[20, 40, 60, 80, 100, 120].map(tick => (
+            <div key={tick} className="absolute top-0 bottom-0 border-l border-gray-600/50" style={{ left: `${(tick/140)*100}%` }} />
+          ))}
+        </div>
+        <div className="text-center">
+          <div className="text-3xl font-bold font-mono">{displayDB.toFixed(1)} <span className="text-lg text-gray-400">dB</span></div>
+          {vizType === 'db_input' && (
+            <div className="text-sm text-emerald-400 mt-2 font-mono border-t border-gray-700 pt-2">
+              Calculated: {result.toExponential(2)} {THEMES.acoustics.formulas.find(f=>f.id===formulaId)?.unit}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // 2. Pitch Visualization (Distance)
+  if (themeId === 'pitch') {
+    let semitones = 0;
+    if (vizType === 'pitch_result') semitones = result;
+    else if (vizType === 'pitch_input') semitones = inputs.n || 0;
+
+    return (
+      <div className="mt-6 p-6 bg-indigo-900 rounded-xl text-white relative overflow-hidden">
+        {/* Piano Key Background Effect */}
+        <div className="absolute inset-0 flex opacity-10 pointer-events-none">
+          {Array.from({length: 12}).map((_, i) => (
+            <div key={i} className={`flex-1 border-r border-white ${[1,3,6,8,10].includes(i) ? 'bg-black' : 'bg-white'}`}></div>
+          ))}
+        </div>
+
+        <div className="relative h-20 flex items-center justify-center">
+          <div className="absolute w-full h-0.5 bg-indigo-500/50"></div>
+          
+          {/* Reference */}
+          <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center">
+            <div className="w-3 h-3 rounded-full bg-gray-400 mb-2"></div>
+            <span className="text-xs text-gray-400">Ref</span>
+          </div>
+
+          {/* Target */}
+          <div 
+            className="absolute flex flex-col items-center transition-all duration-500"
+            style={{ 
+              left: '50%',
+              transform: `translateX(${Math.min(Math.max(semitones * 15, -140), 140)}px)`
+            }}
+          >
+            <div className="w-5 h-5 rounded-full bg-purple-400 border-2 border-white shadow-[0_0_15px_rgba(168,85,247,0.5)] mb-2"></div>
+            <span className="text-xs font-bold text-purple-200">
+              {semitones > 0 ? '+' : ''}{Math.round(semitones)} ST
+            </span>
+          </div>
+        </div>
+        
+        {vizType === 'pitch_input' && (
+          <div className="text-center font-mono text-2xl mt-2 text-purple-300">
+            {result.toFixed(1)} Hz
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // 3. Digital Visualization (Density)
+  if (themeId === 'digital') {
+    const sr = (vizType === 'digital_sr_result') ? result : (inputs.sr || 44100);
+    // Visual clamping
+    const density = Math.min(Math.max(sr / 1000, 2), 50); 
+    
+    return (
+      <div className="mt-6 p-5 bg-emerald-950 rounded-xl text-emerald-100 border border-emerald-900">
+        <div className="text-xs uppercase tracking-widest text-emerald-500 mb-3 font-bold">Sampling Density Visualizer</div>
+        
+        <div className="h-24 relative bg-black/40 rounded-lg overflow-hidden flex items-center">
+          {/* Sine wave path */}
+          <svg className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
+             <path d="M0,48 Q25,0 50,48 T100,48 T150,48 T200,48" fill="none" stroke="#065f46" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+             {/* Dynamic Points based on SR */}
+             {Array.from({ length: Math.floor(density) }).map((_, i) => {
+                const x = (i / (density - 1)) * 100;
+                // Simple approximate sine wave math for dots
+                const normalizedX = (i / (density - 1)) * 4 * Math.PI; 
+                const y = 50 - 35 * Math.sin(normalizedX);
+                return (
+                  <circle key={i} cx={`${x}%`} cy={`${y}%`} r="3" className="fill-emerald-400" />
+                );
+             })}
+          </svg>
+        </div>
+        
+        <div className="flex justify-between items-end mt-4">
+          <div>
+            <div className="text-xs text-emerald-600">Sample Rate</div>
+            <div className="text-xl font-mono font-bold">{sr.toLocaleString()} Hz</div>
+          </div>
+          {vizType === 'digital_sr_result' ? (
+             <div className="text-right">
+               <div className="text-xs text-emerald-600">Result</div>
+               <div className="text-sm">Calculated from samples/duration</div>
+             </div>
+          ) : (
+             <div className="text-right">
+               <div className="text-xs text-emerald-600">Total Samples</div>
+               <div className="text-sm font-mono text-emerald-300">
+                 {formulaId === 'samples' ? result.toLocaleString() : inputs.samps?.toLocaleString() || 0}
+               </div>
+             </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+};
+
+const App = () => {
+  const [activeThemeId, setActiveThemeId] = useState('acoustics');
+  const [activeFormulaIndex, setActiveFormulaIndex] = useState(0);
+  const [inputs, setInputs] = useState({});
+  const [quizMode, setQuizMode] = useState(false);
+  const [quizData, setQuizData] = useState(null);
+  const [quizSelected, setQuizSelected] = useState(null);
+  const [quizResult, setQuizResult] = useState(null);
+
+  const activeTheme = THEMES[activeThemeId];
+  const activeFormula = activeTheme.formulas[activeFormulaIndex];
+
+  useEffect(() => {
+    const defaults = {};
+    activeFormula.inputs.forEach(inp => {
+      defaults[inp.id] = inp.default;
+    });
+    setInputs(defaults);
+  }, [activeFormula]);
+
+  const handleInputChange = (id, value) => {
+    setInputs(prev => ({ ...prev, [id]: parseFloat(value) }));
+  };
+
+  const result = useMemo(() => {
+    const allReady = activeFormula.inputs.every(inp => inputs[inp.id] !== undefined && !isNaN(inputs[inp.id]));
+    if (!allReady) return 0;
+    return activeFormula.calc(inputs);
+  }, [inputs, activeFormula]);
+
+  const startQuiz = () => {
+    setQuizMode(true);
+    setQuizData(generateQuiz(activeThemeId));
+    setQuizSelected(null);
+    setQuizResult(null);
+  };
+
+  const handleAnswer = (option) => {
+    if (quizResult) return;
+    setQuizSelected(option);
+    const isCorrect = Math.abs(option - quizData.answer) < (quizData.answer * 0.001) || option === quizData.answer;
+    setQuizResult(isCorrect ? 'correct' : 'incorrect');
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans text-slate-800">
+      
+      {/* Sidebar */}
+      <div className="w-full md:w-64 bg-white shadow-xl z-20 flex flex-col border-r border-slate-200">
+        <div className="p-6">
+          <h1 className="text-xl font-bold flex items-center gap-2 text-slate-800 tracking-tight">
+            <Calculator className="w-6 h-6 text-blue-600" />
+            <span>音频公式通</span>
+          </h1>
+          <p className="text-xs text-slate-500 mt-1 ml-8">Audio Formula Master</p>
+        </div>
+        
+        <nav className="flex-1 overflow-y-auto px-3 space-y-2 pb-4">
+          {Object.values(THEMES).map(theme => (
+            <button
+              key={theme.id}
+              onClick={() => {
+                setActiveThemeId(theme.id);
+                setActiveFormulaIndex(0);
+                setQuizMode(false);
+              }}
+              className={`w-full text-left px-4 py-3 rounded-xl transition-all flex items-center gap-3 ${
+                activeThemeId === theme.id 
+                  ? `${theme.color} text-white shadow-lg shadow-${theme.color}/30 transform scale-[1.02]` 
+                  : 'hover:bg-slate-100 text-slate-600'
+              }`}
+            >
+              <div className={`p-1 rounded ${activeThemeId === theme.id ? 'bg-white/20' : ''}`}>
+                {theme.icon}
+              </div>
+              <span className="font-medium text-sm">{theme.title}</span>
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 overflow-y-auto p-4 md:p-8 relative">
+        <div className="max-w-5xl mx-auto">
+          
+          <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+            <div>
+              <h2 className="text-3xl font-bold text-slate-900">{activeTheme.title}</h2>
+              <p className="text-slate-500 mt-1">
+                {quizMode ? '测试你的知识掌握程度' : '选择一个公式进行交互式学习'}
+              </p>
+            </div>
+            <button 
+              onClick={startQuiz}
+              className="bg-slate-900 hover:bg-slate-800 text-white px-6 py-2.5 rounded-full shadow-lg font-medium flex items-center gap-2 transition-all active:scale-95"
+            >
+              <BookOpen className="w-4 h-4" />
+              {quizMode ? '换一题 (Next)' : '开始测试 (Quiz)'}
+            </button>
+          </header>
+
+          {quizMode ? (
+            <div className="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden max-w-2xl mx-auto animate-in zoom-in-95 duration-300">
+              <div className="bg-slate-50 px-8 py-6 border-b border-slate-100 flex justify-between items-center">
+                 <span className="font-bold text-slate-700 flex items-center gap-2">
+                   <Activity className="w-4 h-4 text-blue-500" /> 随堂测试
+                 </span>
+                 <span className="text-xs font-mono bg-white border px-2 py-1 rounded text-slate-400">Randomized</span>
+              </div>
+              
+              <div className="p-8">
+                 <div className="text-xl font-medium text-slate-800 leading-relaxed mb-8">
+                   {quizData?.question}
+                 </div>
+
+                 <div className="grid grid-cols-1 gap-3">
+                   {quizData?.options.map((opt, idx) => {
+                     let stateClass = "border-2 border-slate-100 hover:border-blue-400 hover:bg-blue-50 text-slate-600";
+                     if (quizSelected !== null) {
+                       const isOptCorrect = Math.abs(opt - quizData.answer) < (quizData.answer * 0.001) || opt === quizData.answer;
+                       if (isOptCorrect) stateClass = "border-green-500 bg-green-50 text-green-700 ring-1 ring-green-500";
+                       else if (opt === quizSelected) stateClass = "border-red-500 bg-red-50 text-red-700";
+                       else stateClass = "border-slate-100 text-slate-300 opacity-50";
+                     }
+
+                     return (
+                       <button
+                        key={idx}
+                        onClick={() => handleAnswer(opt)}
+                        disabled={quizSelected !== null}
+                        className={`p-4 rounded-xl text-left font-mono text-lg transition-all flex justify-between items-center ${stateClass}`}
+                       >
+                         <span>{opt} <span className="text-sm opacity-70">{quizData.unit}</span></span>
+                         {quizSelected !== null && (Math.abs(opt - quizData.answer) < (quizData.answer * 0.001) || opt === quizData.answer) && <CheckCircle className="w-5 h-5 text-green-600" />}
+                         {quizSelected === opt && quizResult === 'incorrect' && <XCircle className="w-5 h-5 text-red-500" />}
+                       </button>
+                     )
+                   })}
+                 </div>
+
+                 {quizResult && (
+                   <div className="mt-8 flex justify-end">
+                     <button onClick={startQuiz} className="text-blue-600 font-bold hover:underline flex items-center gap-1">
+                       下一题 <ChevronRight className="w-4 h-4" />
+                     </button>
+                   </div>
+                 )}
+              </div>
+            </div>
+          ) : (
+            <div className="grid lg:grid-cols-12 gap-6 items-start">
+              
+              {/* Left Column: Formulas */}
+              <div className="lg:col-span-4 space-y-3">
+                {activeTheme.formulas.map((f, i) => (
+                  <button
+                    key={f.id}
+                    onClick={() => setActiveFormulaIndex(i)}
+                    className={`w-full text-left p-4 rounded-2xl border transition-all duration-200 group ${
+                      activeFormulaIndex === i
+                        ? 'border-blue-500 ring-4 ring-blue-500/10 bg-white shadow-lg'
+                        : 'border-white bg-white hover:bg-slate-50 hover:border-slate-200 shadow-sm text-slate-600'
+                    }`}
+                  >
+                    <div className="font-bold mb-1 group-hover:text-blue-600 transition-colors">{f.name}</div>
+                    <div className="text-xs text-slate-400 truncate">{f.desc}</div>
+                  </button>
+                ))}
+              </div>
+
+              {/* Right Column: Interactive Area */}
+              <div className="lg:col-span-8 space-y-6">
+                
+                {/* Math Display */}
+                <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+                  <div className="bg-slate-50/50 p-8 flex items-center justify-center min-h-[160px] border-b border-slate-100">
+                    <div className="text-2xl md:text-3xl font-serif text-slate-800 flex items-center animate-in fade-in duration-500">
+                      {activeFormula.display}
+                    </div>
+                  </div>
+                  <div className="p-6 bg-white">
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">说明</h3>
+                    <p className="text-slate-600 text-sm leading-relaxed">
+                      {activeFormula.desc}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Laboratory */}
+                <div className="bg-white p-6 md:p-8 rounded-3xl shadow-xl border border-slate-200 ring-1 ring-slate-100">
+                  <div className="flex items-center gap-2 mb-8 pb-4 border-b border-slate-100">
+                    <div className={`w-8 h-8 rounded-full ${activeTheme.lightColor} flex items-center justify-center`}>
+                      {React.cloneElement(activeTheme.icon, { className: `w-4 h-4 ${activeTheme.color.replace('bg-', 'text-')}` })}
+                    </div>
+                    <h3 className="font-bold text-lg text-slate-800">实验面板</h3>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-8">
+                    <div className="space-y-6">
+                      {activeFormula.inputs.map(input => (
+                        <div key={input.id}>
+                           <div className="flex justify-between mb-2">
+                             <label className="text-sm font-semibold text-slate-700">{input.label}</label>
+                             <span className="text-xs font-mono bg-slate-100 px-2 py-1 rounded text-slate-600 border border-slate-200">
+                               {inputs[input.id]}
+                             </span>
+                           </div>
+                           <input 
+                             type="range"
+                             min={input.min}
+                             max={input.max}
+                             step={input.step}
+                             value={inputs[input.id] || 0}
+                             onChange={(e) => handleInputChange(input.id, e.target.value)}
+                             disabled={input.locked}
+                             className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600 hover:accent-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                           />
+                        </div>
+                      ))}
+                      
+                      {/* Result Box */}
+                      <div className="mt-8 p-4 bg-slate-50 rounded-xl border border-slate-200 flex justify-between items-center">
+                        <span className="text-sm font-bold text-slate-500">计算结果</span>
+                        <span className="text-2xl font-mono font-bold text-blue-600">
+                          {result.toPrecision(4)} <span className="text-sm text-slate-400">{activeFormula.unit}</span>
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-900 rounded-2xl p-1 shadow-inner">
+                       <Visualizer 
+                         themeId={activeThemeId} 
+                         formulaId={activeFormula.id}
+                         vizType={activeFormula.vizType}
+                         result={result} 
+                         inputs={inputs} 
+                       />
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          )}
+
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default App;
