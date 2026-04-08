@@ -1,0 +1,51 @@
+<svg width="1280" height="640" viewBox="0 0 1280 640" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="120" y1="80" x2="1140" y2="560" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#07111F"/>
+      <stop offset="0.45" stop-color="#0C2A43"/>
+      <stop offset="1" stop-color="#10324E"/>
+    </linearGradient>
+    <linearGradient id="card" x1="860" y1="120" x2="1140" y2="460" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0F4C81"/>
+      <stop offset="1" stop-color="#1E7BB8"/>
+    </linearGradient>
+    <filter id="blurGlow" x="0" y="0" width="1280" height="640" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="45"/>
+    </filter>
+  </defs>
+
+  <rect width="1280" height="640" rx="32" fill="url(#bg)"/>
+  <circle cx="1088" cy="124" r="124" fill="#3ABEF9" fill-opacity="0.16" filter="url(#blurGlow)"/>
+  <circle cx="196" cy="520" r="136" fill="#66E3C4" fill-opacity="0.14" filter="url(#blurGlow)"/>
+
+  <rect x="68" y="68" width="1144" height="504" rx="28" fill="white" fill-opacity="0.03" stroke="white" stroke-opacity="0.12"/>
+
+  <text x="104" y="156" fill="#9BD4FF" font-family="Avenir, Inter, Arial, sans-serif" font-size="26" font-weight="700" letter-spacing="3.2">DAILY LEARNING AI</text>
+  <text x="104" y="248" fill="white" font-family="Avenir, Inter, Arial, sans-serif" font-size="64" font-weight="800">A living study archive for</text>
+  <text x="104" y="328" fill="white" font-family="Avenir, Inter, Arial, sans-serif" font-size="64" font-weight="800">AI, statistics, speech, and code</text>
+  <text x="104" y="392" fill="#C8DBEA" font-family="Avenir, Inter, Arial, sans-serif" font-size="30" font-weight="500">Course notes, experiments, visual tools, and reproducible practice</text>
+  <text x="104" y="432" fill="#C8DBEA" font-family="Avenir, Inter, Arial, sans-serif" font-size="30" font-weight="500">from the AI &amp; Language master's journey at Stockholm University.</text>
+
+  <rect x="104" y="478" width="194" height="52" rx="26" fill="#0F4C81"/>
+  <text x="138" y="511" fill="white" font-family="Avenir, Inter, Arial, sans-serif" font-size="22" font-weight="700">Python + R</text>
+
+  <rect x="316" y="478" width="214" height="52" rx="26" fill="#145A72"/>
+  <text x="351" y="511" fill="white" font-family="Avenir, Inter, Arial, sans-serif" font-size="22" font-weight="700">ML Labs</text>
+
+  <rect x="548" y="478" width="258" height="52" rx="26" fill="#1D6F6B"/>
+  <text x="583" y="511" fill="white" font-family="Avenir, Inter, Arial, sans-serif" font-size="22" font-weight="700">Interactive HTML</text>
+
+  <rect x="860" y="122" width="274" height="336" rx="28" fill="url(#card)" stroke="white" stroke-opacity="0.16"/>
+  <text x="894" y="178" fill="#D9F2FF" font-family="Avenir, Inter, Arial, sans-serif" font-size="20" font-weight="700">Repository Snapshot</text>
+
+  <rect x="894" y="210" width="206" height="1" fill="white" fill-opacity="0.2"/>
+
+  <text x="894" y="260" fill="white" font-family="Avenir, Inter, Arial, sans-serif" font-size="18" font-weight="700">Knowledge Areas</text>
+  <text x="894" y="292" fill="#D9F2FF" font-family="Avenir, Inter, Arial, sans-serif" font-size="18">Statistics</text>
+  <text x="894" y="322" fill="#D9F2FF" font-family="Avenir, Inter, Arial, sans-serif" font-size="18">Machine Learning</text>
+  <text x="894" y="352" fill="#D9F2FF" font-family="Avenir, Inter, Arial, sans-serif" font-size="18">Speech Analysis</text>
+  <text x="894" y="382" fill="#D9F2FF" font-family="Avenir, Inter, Arial, sans-serif" font-size="18">Applied Programming</text>
+
+  <text x="894" y="432" fill="white" font-family="Avenir, Inter, Arial, sans-serif" font-size="18" font-weight="700">Learning Format</text>
+  <text x="894" y="464" fill="#D9F2FF" font-family="Avenir, Inter, Arial, sans-serif" font-size="18">Notes, labs, scripts, notebooks</text>
+</svg>

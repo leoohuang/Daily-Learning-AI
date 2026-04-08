@@ -1,0 +1,42 @@
+<svg width="1280" height="880" viewBox="0 0 1280 880" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1280" height="880" rx="32" fill="#F4F8FB"/>
+  <text x="76" y="94" fill="#0A2239" font-family="Avenir, Inter, Arial, sans-serif" font-size="42" font-weight="800">Daily Learning AI: knowledge map</text>
+  <text x="76" y="136" fill="#5A6B7A" font-family="Avenir, Inter, Arial, sans-serif" font-size="22">A structured overview of the main study streams and artifact types in this repository.</text>
+
+  <rect x="76" y="190" width="1128" height="610" rx="28" fill="white" stroke="#D7E3EC"/>
+
+  <rect x="112" y="252" width="224" height="124" rx="24" fill="#0F4C81"/>
+  <text x="142" y="304" fill="white" font-family="Avenir, Inter, Arial, sans-serif" font-size="28" font-weight="800">Statistics</text>
+  <text x="142" y="338" fill="#D8EEFF" font-family="Avenir, Inter, Arial, sans-serif" font-size="18">R Markdown labs</text>
+  <text x="142" y="364" fill="#D8EEFF" font-family="Avenir, Inter, Arial, sans-serif" font-size="18">HTML demos and notes</text>
+
+  <rect x="386" y="252" width="224" height="124" rx="24" fill="#15616D"/>
+  <text x="416" y="304" fill="white" font-family="Avenir, Inter, Arial, sans-serif" font-size="28" font-weight="800">Machine Learning</text>
+  <text x="416" y="338" fill="#D8FFF8" font-family="Avenir, Inter, Arial, sans-serif" font-size="18">Regression labs</text>
+  <text x="416" y="364" fill="#D8FFF8" font-family="Avenir, Inter, Arial, sans-serif" font-size="18">Gradient descent visuals</text>
+
+  <rect x="660" y="252" width="224" height="124" rx="24" fill="#1D4E89"/>
+  <text x="690" y="304" fill="white" font-family="Avenir, Inter, Arial, sans-serif" font-size="28" font-weight="800">Speech Analysis</text>
+  <text x="690" y="338" fill="#DDEBFF" font-family="Avenir, Inter, Arial, sans-serif" font-size="18">Signal notes</text>
+  <text x="690" y="364" fill="#DDEBFF" font-family="Avenir, Inter, Arial, sans-serif" font-size="18">Spectrogram tools</text>
+
+  <rect x="934" y="252" width="224" height="124" rx="24" fill="#3A6B35"/>
+  <text x="964" y="304" fill="white" font-family="Avenir, Inter, Arial, sans-serif" font-size="28" font-weight="800">Applied Programming</text>
+  <text x="964" y="338" fill="#E5F8D8" font-family="Avenir, Inter, Arial, sans-serif" font-size="18">Python scripts</text>
+  <text x="964" y="364" fill="#E5F8D8" font-family="Avenir, Inter, Arial, sans-serif" font-size="18">Course notebooks</text>
+
+  <path d="M224 430C224 486 224 486 224 542" stroke="#9EB7C7" stroke-width="4" stroke-linecap="round"/>
+  <path d="M498 430C498 486 498 486 498 542" stroke="#9EB7C7" stroke-width="4" stroke-linecap="round"/>
+  <path d="M772 430C772 486 772 486 772 542" stroke="#9EB7C7" stroke-width="4" stroke-linecap="round"/>
+  <path d="M1046 430C1046 486 1046 486 1046 542" stroke="#9EB7C7" stroke-width="4" stroke-linecap="round"/>
+  <path d="M224 542H1046" stroke="#9EB7C7" stroke-width="4" stroke-linecap="round"/>
+
+  <rect x="430" y="574" width="410" height="148" rx="24" fill="#0A2239"/>
+  <text x="462" y="628" fill="white" font-family="Avenir, Inter, Arial, sans-serif" font-size="30" font-weight="800">Repository Output</text>
+  <text x="462" y="666" fill="#D6E6F2" font-family="Avenir, Inter, Arial, sans-serif" font-size="20">Study notes</text>
+  <text x="610" y="666" fill="#D6E6F2" font-family="Avenir, Inter, Arial, sans-serif" font-size="20">Reproducible labs</text>
+  <text x="820" y="666" fill="#D6E6F2" font-family="Avenir, Inter, Arial, sans-serif" font-size="20">Interactive demos</text>
+  <text x="462" y="700" fill="#D6E6F2" font-family="Avenir, Inter, Arial, sans-serif" font-size="20">Code exercises</text>
+  <text x="610" y="700" fill="#D6E6F2" font-family="Avenir, Inter, Arial, sans-serif" font-size="20">Course artifacts</text>
+  <text x="820" y="700" fill="#D6E6F2" font-family="Avenir, Inter, Arial, sans-serif" font-size="20">Portfolio-ready archive</text>
+</svg>

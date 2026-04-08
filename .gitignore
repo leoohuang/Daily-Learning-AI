@@ -1,9 +1,18 @@
-# 忽略 Python 的缓存文件
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ipynb_checkpoints/
 
-# 忽略 Manim 生成的视频和媒体文件夹
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Manim outputs
 media/
 
-# 忽略系统生成的垃圾文件 (Mac 特有)
+# OS / editor noise
 .DS_Store
+**/.DS_Store

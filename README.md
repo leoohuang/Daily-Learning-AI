@@ -1,29 +1,91 @@
 # Daily Learning AI
 
-> "The journey of a thousand miles begins with a single step."
-> 记录我在斯德哥尔摩大学 AI & Language 硕士期间的学习历程、代码实践和论文复现。
+![Daily Learning AI banner](./assets/github-banner.svg)
 
-## 🎯 目标 (Goals)
+> A curated learning archive documenting my AI, statistics, speech analysis, and applied programming journey during the AI & Language master's program at Stockholm University.
+>
+> 这是一个持续更新的学习仓库，用来系统记录我在斯德哥尔摩大学 AI & Language 硕士阶段的课程学习、实验练习、代码实现和知识可视化过程。
 
-- **核心基础**: 精通 Python 高级编程与数据结构算法
-- **理论深化**: 深入理解 Transformer, Attention 机制及 LLM 架构
-- **工程实战**: 能够从零复现经典论文 (BERT, GPT) 并部署应用
+## Overview
 
-## 🛠️ 技术栈 (Tech Stack)
+This repository is not a single app. It is a structured knowledge base built from day-to-day study materials:
 
-- **Language**: Python, Shell, R
-- **Deep Learning**: PyTorch, Hugging Face
-- **Tools**: Git, Docker, Linux
+- course notes and concept summaries
+- reproducible lab work in Python and R Markdown
+- interactive HTML learning tools and visual explainers
+- small coding experiments in machine learning, signal analysis, and scientific programming
 
-## 🗂️ 知识库导航 (Knowledge Base)
+The goal is to turn fragmented coursework into a reusable, searchable, and portfolio-ready learning system.
 
-- **📂 [Python 学习笔记](./Python/README.md)**: 包含基础语法、高级特性及脚本实战。
-- **📂 [NLP 论文笔记](./NLP/README.md)**: Transformer, BERT, LLM 等论文复现与解读。
-- **📂 [LeetCode 题解](./LeetCode/README.md)**: 算法题分类汇总。
+## What This Repository Covers
 
-## 🔥 最近更新 (Latest Updates)
-*只列出最近 3 天学的最重要的一两个点，旧的就删掉*
-- [2025-11-21] 学习了 Python 列表推导式
+| Area | Focus | Typical Artifacts |
+| --- | --- | --- |
+| [Statistics](./Statistics/) | descriptive statistics, inference, regression, categorical predictors | `.md`, `.Rmd`, `.html`, datasets |
+| [Machine Learning](./Machine%20Learning/) | regression, resampling, clustering, gradient descent intuition | labs, notes, Python scripts, HTML visualizations |
+| [Speech Analysis](./Speech%20Analysis/) | time-frequency analysis, auditory perception, spectrogram concepts | notes, JSX, HTML tools |
+| [Applied Programming](./applied%20programming/) | NumPy, SciPy, sparse matrices, dimensionality reduction, backpropagation | Python scripts, lecture materials, notebook exports |
+| [Python](./Python/) | syntax notes and language features | topic notes and mini examples |
+| [Manim-test](./Manim-test/) | lightweight animation experiments | Python scenes |
 
----
-*Created by Leo Huang. Continuing to grow every day.*
+## Featured Materials
+
+- [Gradient Descent Visual Simulator](./Machine%20Learning/gradient%20descent/梯度下降可视化模拟器.html)
+- [Time-Frequency Analysis Notes](./Speech%20Analysis/Time-Frequency%20Analysis.md)
+- [Spectrogram Visualization Tool](./Speech%20Analysis/spectrogram%20可视化工具.html)
+- [List Comprehension Notes](./Python/list-comprehension.md)
+- [Backpropagation Notebook Export](./applied%20programming/lecture/18%20-%20Backpropagation.ipynb)
+- [Multiple Regression Cost Function Script](./Machine%20Learning/regression%20model/compute_cost.py)
+
+## Repository Snapshot
+
+![Learning map](./assets/learning-map.svg)
+
+```text
+Daily-Learning-AI/
+├── Machine Learning/      # ML labs, regression notes, gradient descent, R Markdown work
+├── Statistics/            # statistical notes, demos, HTML visualizations, R materials
+├── Speech Analysis/       # speech science notes and interactive tools
+├── applied programming/   # scientific programming exercises and lecture artifacts
+├── Python/                # Python topic notes
+├── Manim-test/            # animation experiments
+└── assets/                # GitHub-facing visuals for project presentation
+```
+
+## Why I Built It This Way
+
+- To make daily learning compounding rather than disposable
+- To keep theory, code, and visualization in the same place
+- To document progress in a way that is useful both for revision and for public portfolio presentation
+
+Instead of treating coursework as isolated assignments, this repository organizes it as a long-term technical learning archive.
+
+## Tech Stack
+
+- Languages: Python, R, Markdown, HTML, JSX, Shell
+- Tools: Git, Jupyter, Manim
+- Topics: machine learning, statistics, speech analysis, scientific computing
+
+## How To Browse This Repo
+
+If you are visiting this repository for the first time, this path works best:
+
+1. Start from the topic folders above.
+2. Open the Markdown notes for concepts and summaries.
+3. Explore the HTML files for interactive explanations and visual intuition.
+4. Check the Python and R Markdown files for implementation details and lab practice.
+
+## Current Direction
+
+This repository is actively evolving toward a cleaner public-facing study archive with:
+
+- more topic indexes
+- better cross-linking between notes and code
+- cleaner examples and reproducible experiments
+- stronger GitHub presentation assets
+
+## Author
+
+**Leo Huang**
+
+If you are also building an AI learning system from coursework, notes, and experiments, feel free to use this repository as inspiration for structuring your own knowledge base.
